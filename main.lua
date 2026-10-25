@@ -1,10 +1,11 @@
--- Chop-A-Forest | TELEGRAPH DODGE V4.5 | github.com/xFellix-cyfraoryginal/Chop-A-Forest
+-- Chop-A-Forest | STARTER+UPGRADES+ENDLESS V4.7 | github.com/xFellix-cyfraoryginal/Chop-A-Forest
 -- All Lua/Luau, no build step. Upload main.lua and cogs/ together.
 local BASE = 'https://raw.githubusercontent.com/xFellix-cyfraoryginal/Chop-A-Forest/main/'
-local VERSION = '4.6.0'
+local VERSION = '4.7.0'
 local FILES = {
     'core', 'world', 'navigation', 'tools', 'survival',
-    'trees', 'collection', 'combat', 'dodge', 'scheduler', 'ui'
+    'trees', 'collection', 'combat', 'dodge',
+    'starter', 'upgrades', 'endless', 'scheduler', 'ui'
 }
 local env = (type(getgenv) == 'function' and getgenv()) or _G
 assert(type(loadstring) == 'function', '[CAF V4] Executor requires loadstring')
@@ -36,4 +37,4 @@ if not ok then
     error('[CAF V4] Start failed: ' .. tostring(err))
 end
 env.CAF_V4, env.CAF_ALPHA = C, C
-print('[CAF V4] SKELETON FOCUS ' .. VERSION .. ' ready (F8 = STOP)')
+print('[CAF V4] STARTER AUTO BUY ' .. VERSION .. ' ready (F8 = STOP)')

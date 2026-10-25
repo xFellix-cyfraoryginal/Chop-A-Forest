@@ -9,6 +9,8 @@ return function(C)
         self.stage = 'TREE: chopping'
         local failed, swings = 0, 0
         while self.running and not self:isPaused() and not self:urgentCombat()
+            and not (not self.starterFarming and self.cfg.priority=='ATTACK'
+                and self:pickSkeleton())
             and self:treeValid(tree) and swings < 65 do
             if self.isDodging and self:isDodging() then return false end
             part=self:treePart(tree)
@@ -28,6 +30,8 @@ return function(C)
                 local deadline=os.clock()+1.15
                 local changed=false
                 while self.running and not self:isPaused() and not self:urgentCombat()
+                    and not (not self.starterFarming and self.cfg.priority=='ATTACK'
+                and self:pickSkeleton())
                     and os.clock()<deadline do
                     local hp=tree:GetAttribute('HP')
                     if tree:GetAttribute('Felled')==true or (type(hp)=='number' and hp<previous-.01) then

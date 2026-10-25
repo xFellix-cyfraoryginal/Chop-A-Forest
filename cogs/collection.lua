@@ -3,14 +3,13 @@ return function(C)
     function C:collectOne(log)
         local job=self.wood[log]
         if not job or job.done or not self:woodReady(log,job) then return false end
-        if self:isPaused() or self:urgentCombat() then return false end
+        if self:isPaused() or self:urgentCombat()
+            or (not self.starterFarming and self.cfg.priority=='ATTACK'
+                and self.cfg.combat and self:pickSkeleton()) then return false end
         local _,bagOwned,carried=self:equipmentStatus()
-        if bagOwned==false or carried>0 then
-            self.stage='WOOD: backpack required / hands occupied'
-            self:note('E pickup blocked: no backpack or hands carry logs')
-            task.wait(.4)
-            return false
-        end
+        -- V9: without backpack, HUD is 0/5 and CarriedLogs counts 0..5.
+        -- Continue collecting by hand; do not mistake 0/5 for owned backpack.
+        local handMode=not bagOwned
         local have,cap=self:backpack()
         if not have or not cap or have>=cap then return false end
         local at=self:woodPosition(log)
@@ -25,31 +24,41 @@ return function(C)
         self.stage='WOOD: E pickup'
         local success=false
         for attempt=1,2 do
-            if not self.running or self:isPaused() or self:urgentCombat() or job.done then break end
+            if not self.running or self:isPaused() or self:urgentCombat() or job.done
+                or (not self.starterFarming and self.cfg.priority=='ATTACK'
+                    and self:pickSkeleton()) then break end
             local before=self:backpack()
-            if not before or before>=cap then break end
+            local oldCarry=self.player:GetAttribute('CarriedLogs') or 0
+            if before==nil or before>=cap then break end
             local p=self:woodPosition(log)
             if p then at=p end
-            -- Try the interact key first. It doesn't trigger an axe animation.
-            local sent=self:useItem(at,'Pickup')
+            -- With loose logs in hands, use a directed click first.
+            -- Blind E can THROW already held logs when the target isn't found.
+            local sent=self:useItem(at,handMode and 'PickupClick' or 'Pickup')
             if sent then
                 local deadline=os.clock()+.30
                 while self.running and not self:isPaused() and os.clock()<deadline do
                     local after=self:backpack()
-                    if after and after>before then success=true; break end
+                    local held=self.player:GetAttribute('CarriedLogs') or 0
+                    if (after and after>before) or held>oldCarry then
+                        success=true; break
+                    end
                     if log.Parent~=self.logsFolder then break end
                     task.wait(.035)
                 end
             end
             if success or log.Parent~=self.logsFolder then break end
-            -- If E wasn't handled by this game/executor, fall back to a click.
+            -- Avoid E while already carrying logs: it can throw them.
             self.stage='WOOD: click fallback'
-            local ok=self:useItem(at,'PickupClick')
+            local ok=(not handMode) and self:useItem(at,'PickupClick') or false
             if ok then
                 local deadline=os.clock()+.48
                 while self.running and not self:isPaused() and os.clock()<deadline do
                     local after=self:backpack()
-                    if after and after>before then success=true; break end
+                    local held=self.player:GetAttribute('CarriedLogs') or 0
+                    if (after and after>before) or held>oldCarry then
+                        success=true; break
+                    end
                     if log.Parent~=self.logsFolder then break end
                     task.wait(.045)
                 end

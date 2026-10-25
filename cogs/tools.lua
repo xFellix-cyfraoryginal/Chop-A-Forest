@@ -167,6 +167,11 @@ return function(C)
     function C:useItem(target, purpose)
         if not self.running or self:isPaused() then return false end
         if self.isDodging and self:isDodging() then return false,'Dodging red zone' end
+        if purpose~='Combat' and not self.starterFarming
+            and self.cfg.priority=='ATTACK'
+            and self.cfg.combat and self:pickSkeleton() then
+            return false,'Skeleton spawned; switching priority'
+        end
         if purpose~='Combat' and self.cfg.priority~='ATTACK' and self:urgentCombat() then
             return false,'Retaliating against mob'
         end
@@ -193,7 +198,9 @@ return function(C)
                 or (purpose=='Tree' and (profile=='Fists' or profile=='Pistol'
                     or profile=='Vacuum'))
                 or (purpose=='Combat' and profile=='Fists')
-            if needsAxe then
+            local owned=self.player:GetAttribute('OwnsAxe')==true
+                or type(self.player:GetAttribute('AxeBoughtAt'))=='number'
+            if needsAxe and owned then
                 self:pressSlot(2)
                 profile,held=self:activeProfile()
             end

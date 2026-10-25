@@ -21,7 +21,8 @@ return function(C)
         retaliateSeconds = 9, clearUntil = 1, combatRadius = 65,
         pickupRange = 3.7, treeRange = 3.7,
         maxTreeDistance = math.huge, idlePause = .15,
-        useExperimental = false
+        useExperimental = false, autoBuy = true,
+        autoUpgrade = true, autoEndless = true
     }
     C.toolAt, C.toolSlot = {}, ''
     function C:connect(signal, callback)
@@ -62,16 +63,11 @@ return function(C)
     -- solely from the "0/5" HUD; rely on a positive Gear marker if present.
     function C:equipmentStatus()
         local axe=self.player:GetAttribute('AxeBoughtAt')
-        local hasAxe=type(axe)=='number' and axe>0
-        local bagAttr
-        for _,key in ipairs({'BackpackBoughtAt','BagBoughtAt','GearBoughtAt',
-            'OwnsBackpack','OwnsBag','HasBackpack','BackpackOwned'}) do
-            local value=self.player:GetAttribute(key)
-            if value~=nil then
-                bagAttr=type(value)=='number' and value>0 or value==true
-                break
-            end
-        end
+        local hasAxe=(type(axe)=='number' and axe>0)
+            or self.player:GetAttribute('OwnsAxe')==true
+        -- V9 verified: Up_GearBackpack 0 -> 1 and bag 5 -> 15.
+        local level=self.player:GetAttribute('Up_GearBackpack')
+        local bagAttr=type(level)=='number' and level>0 or nil
         local carrying=self.player:GetAttribute('CarriedLogs')
         local carried=type(carrying)=='number' and carrying or 0
         local _,capacity=self:backpack()

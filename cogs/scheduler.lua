@@ -9,11 +9,18 @@ return function(C)
             self.stage='DODGE: warning active'
             task.wait(.06); return
         end
+        if self:postBossStep() then return end
         local bag,cap=self:backpack()
+        local axe,boughtBag=self:equipmentStatus()
+        local setup=not axe or not boughtBag
+        self.starterFarming=setup
+        if setup and self.cfg.autoBuy then
+            if self:starterStep() then return end
+        end
         if bag==nil then
             self.stage='WAIT: backpack HUD'; task.wait(.45); return
         end
-        if self.cfg.priority=='ATTACK' and self.cfg.combat then
+        if not setup and self.cfg.priority=='ATTACK' and self.cfg.combat then
             -- ALWAYS chase a live Gravedigger/Skeleton, including the last
             -- one. When none are present, farm trees to progress the event.
             -- Do not divert to Biters/Pumpkinlings or the Guardian boss.
@@ -71,6 +78,7 @@ return function(C)
         if self.cfg.sell and bag>0 then
             self:sellBag(); return
         end
+        if not setup and self.cfg.autoUpgrade and self:upgradeStep() then return end
         local tree=self:chooseTree()
         if tree then self:chopTree(tree); return end
         local info=self.treeScan or {}
@@ -98,24 +106,9 @@ return function(C)
         if not self.treesFolder or not self.logsFolder then
             self:note('Missing Workspace.Map.Trees or Workspace.Logs'); return
         end
-        local axe,bag,carried,capacity=self:equipmentStatus()
-        if not axe then
-            self.stage='SETUP: buy AXE first'
-            self:note('Axe missing (AxeBoughtAt): buy the starter axe before START')
-            return
-        end
-        if bag==false or capacity==0 then
-            self.stage='SETUP: buy BACKPACK first'
-            self:note('Backpack missing: buy it before automatic E pickups')
-            return
-        end
-        if carried>0 then
-            self.stage='SETUP: hands holding logs'
-            self:note('CarriedLogs > 0: deposit held logs before START')
-            return
-        end
-        if bag==nil then
-            self:note('Backpack ownership unverified; E pickup guarded by CarriedLogs')
+        local axe,boughtBag=self:equipmentStatus()
+        if not axe or not boughtBag then
+            self:note('Starter mode: farm hands -> Backpack $90 -> Axe $75')
         end
         self.running=true; self.session=self.session+1
         self.panic=false; self.lastHP=nil
@@ -124,7 +117,7 @@ return function(C)
         self.safeTree=nil; self.safeTreeUntil=0
         local session=self.session
         self.stage='STARTING'
-        self:note('V4.6 SKELETON FOCUS '..self.cfg.priority..' FIRST / '..self.cfg.move)
+        self:note('V4.7 STARTER AUTO BUY '..self.cfg.priority..' / '..self.cfg.move)
         task.spawn(function() self:watchSafety(session) end)
         task.spawn(function() self:workLoop(session) end)
     end

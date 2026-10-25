@@ -30,7 +30,7 @@ return function(C)
     local top=round(make('Frame',{Size=UDim2.new(1,0,0,48),
         BackgroundColor3=surface,BorderSizePixel=0},panel),12)
     make('TextLabel',{Size=UDim2.new(1,-92,1,0),Position=UDim2.fromOffset(13,0),
-        BackgroundTransparency=1,Text='CHOP A FOREST / SKELETON V4.6',TextSize=14,
+        BackgroundTransparency=1,Text='CHOP A FOREST / STARTER V4.7',TextSize=14,
         Font=Enum.Font.GothamBold,TextColor3=ink,TextXAlignment=Enum.TextXAlignment.Left},top)
     local function button(parent,text,y,height,color,clicked)
         local b=round(make('TextButton',{Size=UDim2.new(1,-20,0,height or 37),
@@ -105,7 +105,7 @@ return function(C)
     end)
     label(main,'ATTACK = Gravediggers only  |  F8 STOP',237,12)
     local tools=pages.TOOLS
-    label(tools,'Equip owned tools in-game before using them.',6,12)
+    label(tools,'Auto Buy / Axe Upgrades / Endless: ON by default',6,12)
     local profile=button(tools,'Tool: Auto',47,39,surface,function() end)
     C:connect(profile.MouseButton1Click,function()
         local items={'Auto','Axe','Fists','Chainsaw','Pistol','Vacuum'}
