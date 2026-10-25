@@ -12,16 +12,23 @@ return function(C)
         sellAfterTree = true, sellWhenFull = true,
         autoCollect = true, autoSell = true, goldFirst = false,
         showTree = true, showLogs = false, selectedArea = "Current",
-        maxFailures = 3, maxTreeDistance = 220
+        maxFailures = 3, maxTreeDistance = 220,
+        pickupDistance = 4.6, pickupDelay = 0.32, pickupRetries = 3,
+        autoCombat = false, combatMode = "Defend", combatPriority = "Threats",
+        combatSearch = 75, combatReach = 5, combatDelay = 0.57,
+        combatTool = "2", combatHealth = 22, showMobs = true,
+        eventOnly = false, eventMobs = false
     }
     C.alive = true
     C.running = false
     C.motionToken = 0
     C.logs = {}
     C.logLimit = 220
-    C.stats = {felled = 0, pickups = 0, sold = 0, hits = 0, failures = 0}
+    C.stats = {felled = 0, pickups = 0, sold = 0, hits = 0, failures = 0,
+        mobHits = 0, mobKills = 0, combatFailures = 0}
     C.stage = "Idle"
     C.target = nil
+    C.targetEnemy = nil
     C.connections = {}
     C.cleanup = {}
     C.vis = {}
@@ -77,6 +84,7 @@ return function(C)
         self.running = false
         self.motionToken = self.motionToken + 1
         self.stage = "Stopped"
+        self.targetEnemy = nil
         local _, _, hum = self:character()
         local pos = self:pos()
         if hum and pos then hum:MoveTo(pos) end
@@ -91,11 +99,12 @@ return function(C)
             local ok, err = pcall(function() self:engine() end)
             if not ok then self:note("error", err) end
             self.running = false
+            self.targetEnemy = nil
             self.stage = "Idle"
         end)
     end
     function C:export()
-        local data = {version = "Alpha 1", stats = self.stats, config = self.config,
+        local data = {version = "Alpha 2 - Event Combat", stats = self.stats, config = self.config,
             state = self.stage, problem = self.lastIssue, logs = self.logs,
             placeId = game.PlaceId, cash = self:cash()}
         local ok, payload = pcall(self.http.JSONEncode, self.http, data)

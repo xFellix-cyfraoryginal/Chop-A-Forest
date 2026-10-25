@@ -33,7 +33,9 @@ return function(C)
         local area = self.config.selectedArea == "Current" and self:area()
             or tonumber(self.config.selectedArea)
         for t in pairs(self.trees) do
-            if self:treeOK(t) and (not area or area == t:GetAttribute("AreaIndex")) then
+            if self:treeOK(t) and (not area or area == t:GetAttribute("AreaIndex"))
+                and (not self.config.eventOnly or t:GetAttribute("Biome") == "Graveyard"
+                    or tostring(t:GetAttribute("TreeType") or ""):find("^Haunted") ~= nil) then
                 local part = self:trunk(t)
                 local d = (part.Position - p).Magnitude
                 if d <= self.config.maxTreeDistance and (self.failedTrees[t] or 0) < self.config.maxFailures then
@@ -73,14 +75,15 @@ return function(C)
         C:connect(C.logFolder.ChildAdded, addLog)
         C:connect(C.logFolder.ChildRemoved, function(obj) C.drops[obj] = nil end)
     end
-    function C:nearestLog(maxD)
+    function C:nearestLog(maxD, rejected)
         local p = self:pos()
         if not p then return nil end
         local best, distance
         for log in pairs(self.drops) do
             local pt = self:logPart(log)
             local d = pt and (pt.Position - p).Magnitude or math.huge
-            if d < (maxD or 65) and (not distance or d < distance) then
+            if not (rejected and rejected[log]) and d < (maxD or 65)
+                and (not distance or d < distance) then
                 best, distance = log, d
             end
         end
@@ -90,7 +93,11 @@ return function(C)
         local spot = self.sell
         if not spot or not spot.Parent then return nil end
         if spot:IsA("BasePart") then return spot.Position end
-        if spot:IsA("Model") then return spot:GetPivot().Position end
+        if spot:IsA("Model") then
+            local pad = spot:FindFirstChild("DepositPad", true)
+            if pad and pad:IsA("BasePart") then return pad.Position end
+            return spot:GetPivot().Position
+        end
         return nil
     end
     function C:groundAt(position)

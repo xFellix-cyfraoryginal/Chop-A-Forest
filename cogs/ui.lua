@@ -1,169 +1,210 @@
+-- Compact Luau UI: no external UI framework, 6 small tabs, draggable/minimizable.
 return function(C)
-    local UI = {}
-    C.ui = UI
-    local colors = {bg = Color3.fromRGB(12, 17, 27), panel = Color3.fromRGB(22, 30, 45),
-        border = Color3.fromRGB(45, 62, 83), text = Color3.fromRGB(236, 243, 253),
-        secondary = Color3.fromRGB(155, 171, 193), accent = Color3.fromRGB(70, 138, 249),
-        green = Color3.fromRGB(65, 198, 135), red = Color3.fromRGB(214, 87, 101)}
-    local function new(class, props, parent)
-        local x = Instance.new(class)
-        for key, value in pairs(props or {}) do x[key] = value end
-        if parent then x.Parent = parent end
-        return x
+    local colors = {bg=Color3.fromRGB(11,16,28), panel=Color3.fromRGB(21,30,47),
+        field=Color3.fromRGB(39,53,75), text=Color3.fromRGB(238,244,255),
+        muted=Color3.fromRGB(152,172,197), accent=Color3.fromRGB(78,143,255),
+        green=Color3.fromRGB(53,194,136), red=Color3.fromRGB(209,80,97)}
+    local function obj(class, props, parent)
+        local v=Instance.new(class)
+        for k,val in pairs(props) do v[k]=val end
+        v.Parent=parent
+        return v
     end
-    local function rounded(obj, r)
-        new("UICorner", {CornerRadius = UDim.new(0, r or 7)}, obj)
-        return obj
+    local function round(v, r)
+        obj("UICorner",{CornerRadius=UDim.new(0,r or 8)},v)
+        return v
     end
-    local env = type(gethui) == "function" and gethui() or game:GetService("CoreGui")
-    local gui = new("ScreenGui", {Name="CropForest_AutoFarm_Alpha", ResetOnSpawn=false,
-        IgnoreGuiInset=true, ZIndexBehavior=Enum.ZIndexBehavior.Sibling}, env)
-    C.gui = gui
-    local main = rounded(new("Frame", {Position=UDim2.fromOffset(24, 115), Size=UDim2.fromOffset(408, 418),
-        BackgroundColor3=colors.bg, BorderSizePixel=0}, gui), 12)
-    new("UIStroke", {Color=colors.border, Thickness=1}, main)
-    local head = rounded(new("Frame", {Size=UDim2.new(1, 0, 0, 46), BackgroundColor3=colors.panel,
-        BorderSizePixel=0}, main), 12)
-    new("TextLabel", {Size=UDim2.new(1, -110, 1, 0), Position=UDim2.fromOffset(16, 0),
-        BackgroundTransparency=1, TextXAlignment=Enum.TextXAlignment.Left,
-        Text="CROP FOREST  |  AUTO FARM ALPHA", TextColor3=colors.text,
-        Font=Enum.Font.GothamBold, TextSize=13}, head)
-    local function action(parent, name, text, pos, size, bg, onClick)
-        local b = rounded(new("TextButton", {Name=name, Position=pos, Size=size,
-            BackgroundColor3=bg, Text=text, TextColor3=colors.text,
-            Font=Enum.Font.GothamSemibold, TextSize=12, AutoButtonColor=true}, parent), 7)
-        C:connect(b.MouseButton1Click, onClick)
+    local parent = type(gethui)=="function" and gethui() or game:GetService("CoreGui")
+    local gui=obj("ScreenGui",{Name="ChopAForest_CS_V2",ResetOnSpawn=false,
+        IgnoreGuiInset=true,ZIndexBehavior=Enum.ZIndexBehavior.Sibling},parent)
+    C.gui=gui
+    local width,height=454,470
+    local panel=round(obj("Frame",{Size=UDim2.fromOffset(width,height),
+        Position=UDim2.fromOffset(26,125),BackgroundColor3=colors.bg,BorderSizePixel=0},gui),12)
+    obj("UIStroke",{Color=colors.field,Thickness=1},panel)
+    local head=round(obj("Frame",{Size=UDim2.new(1,0,0,48),
+        BackgroundColor3=colors.panel,BorderSizePixel=0},panel),12)
+    obj("TextLabel",{Size=UDim2.new(1,-104,1,0),Position=UDim2.fromOffset(15,0),
+        BackgroundTransparency=1,TextXAlignment=Enum.TextXAlignment.Left,
+        Font=Enum.Font.GothamBold,TextSize=14,TextColor3=colors.text,
+        Text="CROP FOREST  /  ALPHA V2"},head)
+    local function button(parent,text,x,y,w,h,col,click)
+        local b=round(obj("TextButton",{Size=UDim2.fromOffset(w,h),
+            Position=UDim2.fromOffset(x,y),BackgroundColor3=col,BorderSizePixel=0,
+            Text=text,TextColor3=colors.text,Font=Enum.Font.GothamSemibold,TextSize=12},parent),7)
+        C:connect(b.MouseButton1Click,click)
         return b
     end
-    action(head,"Close","X",UDim2.new(1,-38,0,8),UDim2.fromOffset(30,30),colors.red,function() C:unload() end)
-    local minimized = false
-    action(head,"Min","_",UDim2.new(1,-74,0,8),UDim2.fromOffset(30,30),colors.border,function()
-        minimized = not minimized
-        main.Size = minimized and UDim2.fromOffset(408,46) or UDim2.fromOffset(408,418)
-        for _, c in ipairs(main:GetChildren()) do if c ~= head and c:IsA("GuiObject") then c.Visible=not minimized end end
+    button(head,"X",width-38,9,28,29,colors.red,function() C:unload() end)
+    local minimized=false
+    local content
+    button(head,"_",width-75,9,28,29,colors.field,function()
+        minimized=not minimized
+        panel.Size=UDim2.fromOffset(width,minimized and 48 or height)
+        if content then content.Visible=not minimized end
     end)
-    local tabs = new("Frame", {Position=UDim2.fromOffset(12,54),Size=UDim2.new(1,-24,0,31),BackgroundTransparency=1},main)
-    local names = {"FARM","MOVE","OPTIONS","DEBUG"}
-    local pages = {}
-    local buttons = {}
-    local selected = "FARM"
+    content=obj("Frame",{Position=UDim2.fromOffset(0,48),Size=UDim2.new(1,0,1,-48),
+        BackgroundTransparency=1},panel)
+    local names={"FARM","MOVE","COMBAT","EVENT","CONFIG","DEBUG"}
+    local pages,tabBtns={},{}
+    local tabs=obj("Frame",{Position=UDim2.fromOffset(12,8),Size=UDim2.new(1,-24,0,29),
+        BackgroundTransparency=1},content)
+    local active=names[1]
+    local function selectPage(name)
+        active=name
+        for id,page in pairs(pages) do page.Visible=id==active end
+        for id,b in pairs(tabBtns) do
+            b.BackgroundColor3=id==active and colors.accent or colors.panel
+        end
+    end
+    local tabWidth=(width-24)/#names
     for i,name in ipairs(names) do
-        local b = action(tabs,name,name,UDim2.new((i-1)/4,3,0,0),UDim2.new(0.25,-6,1,0),colors.panel,function()
-            selected=name
-            for k,page in pairs(pages) do page.Visible=k==selected end
-            for k,btn in pairs(buttons) do btn.BackgroundColor3=k==selected and colors.accent or colors.panel end
-        end)
-        buttons[name]=b
-        local page=new("ScrollingFrame", {Name=name,Position=UDim2.fromOffset(12,91), Size=UDim2.new(1,-24,1,-158),
-            BackgroundTransparency=1,ScrollBarThickness=3,CanvasSize=UDim2.fromOffset(0,0),
-            AutomaticCanvasSize=Enum.AutomaticSize.Y,Visible=i==1,BorderSizePixel=0},main)
-        new("UIListLayout",{Padding=UDim.new(0,5),SortOrder=Enum.SortOrder.LayoutOrder},page)
+        tabBtns[name]=button(tabs,name,math.floor((i-1)*tabWidth),0,
+            math.floor(tabWidth-5),29,colors.panel,function() selectPage(name) end)
+        local page=obj("ScrollingFrame",{Position=UDim2.fromOffset(12,44),
+            Size=UDim2.new(1,-24,1,-129),CanvasSize=UDim2.fromOffset(0,0),
+            AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollBarThickness=3,
+            BackgroundTransparency=1,BorderSizePixel=0,Visible=(i==1)},content)
+        obj("UIListLayout",{Padding=UDim.new(0,6),SortOrder=Enum.SortOrder.LayoutOrder},page)
         pages[name]=page
     end
-    buttons.FARM.BackgroundColor3=colors.accent
-    local function row(page, label, value, callback)
-        local bar=rounded(new("Frame",{Size=UDim2.new(1,-7,0,34),BackgroundColor3=colors.panel,BorderSizePixel=0},page),7)
-        new("TextLabel",{Size=UDim2.new(0.56,0,1,0),Position=UDim2.fromOffset(10,0),BackgroundTransparency=1,
-            Text=label,TextXAlignment=Enum.TextXAlignment.Left,TextColor3=colors.text,Font=Enum.Font.Gotham,TextSize=12},bar)
+    selectPage("FARM")
+    local function settingRow(page,title,initial,cb)
+        local row=round(obj("Frame",{Size=UDim2.new(1,-7,0,35),
+            BackgroundColor3=colors.panel,BorderSizePixel=0},page),7)
+        obj("TextLabel",{Position=UDim2.fromOffset(10,0),Size=UDim2.new(.56,-10,1,0),
+            BackgroundTransparency=1,TextXAlignment=Enum.TextXAlignment.Left,
+            Text=title,Font=Enum.Font.Gotham,TextSize=12,TextColor3=colors.text},row)
         local b
-        b=action(bar,"Value",tostring(value),UDim2.new(0.57,0,0,4),UDim2.new(0.41,-7,1,-8),colors.border,function()
-            local nextVal=callback()
-            b.Text=tostring(nextVal)
-        end)
+        b=round(obj("TextButton",{Position=UDim2.new(.57,0,0,4),Size=UDim2.new(.41,-8,1,-8),
+            Text=tostring(initial),TextColor3=colors.text,TextSize=11,
+            Font=Enum.Font.GothamBold,BackgroundColor3=colors.field,BorderSizePixel=0},row),6)
+        C:connect(b.MouseButton1Click,function() b.Text=tostring(cb()) end)
         return b
     end
-    local function switch(page,title,key)
-        row(page,title,C.config[key] and "ON" or "OFF",function()
+    local function toggle(page,title,key)
+        settingRow(page,title,C.config[key] and "ON" or "OFF",function()
             C.config[key]=not C.config[key]
             return C.config[key] and "ON" or "OFF"
         end)
     end
-    local function options(page,title,key,list)
-        local index=table.find(list,C.config[key]) or 1
-        row(page,title,C.config[key],function()
-            index=index%#list+1
-            C.config[key]=list[index]
-            return list[index]
+    local function options(page,title,key,values)
+        local idx=table.find(values,C.config[key]) or 1
+        settingRow(page,title,C.config[key],function()
+            idx=idx%#values+1
+            C.config[key]=values[idx]
+            return values[idx]
         end)
     end
-    local function number(page,title,key,min,max,delta)
-        local bar=rounded(new("Frame",{Size=UDim2.new(1,-7,0,36),BackgroundColor3=colors.panel,BorderSizePixel=0},page),7)
-        new("TextLabel",{Size=UDim2.new(.49,0,1,0),Position=UDim2.fromOffset(10,0),BackgroundTransparency=1,
-            Text=title,TextXAlignment=Enum.TextXAlignment.Left,TextColor3=colors.text,Font=Enum.Font.Gotham,TextSize=12},bar)
-        local field=rounded(new("TextBox",{Position=UDim2.new(.53,0,0,4),Size=UDim2.new(.42,0,1,-8),
-            BackgroundColor3=colors.border,Text=tostring(C.config[key]),ClearTextOnFocus=false,
-            TextColor3=colors.text,Font=Enum.Font.Gotham,TextSize=12},bar),5)
+    local function number(page,title,key,minV,maxV,step)
+        local row=round(obj("Frame",{Size=UDim2.new(1,-7,0,35),
+            BackgroundColor3=colors.panel,BorderSizePixel=0},page),7)
+        obj("TextLabel",{Position=UDim2.fromOffset(10,0),Size=UDim2.new(.53,-10,1,0),
+            BackgroundTransparency=1,TextXAlignment=Enum.TextXAlignment.Left,
+            Text=title,Font=Enum.Font.Gotham,TextSize=12,TextColor3=colors.text},row)
+        local field=round(obj("TextBox",{Position=UDim2.new(.56,0,0,4),
+            Size=UDim2.new(.42,-8,1,-8),Text=tostring(C.config[key]),
+            ClearTextOnFocus=false,TextColor3=colors.text,TextSize=12,
+            Font=Enum.Font.GothamSemibold,BackgroundColor3=colors.field},row),6)
         C:connect(field.FocusLost,function()
             local n=tonumber(field.Text)
-            if n then C.config[key]=math.floor(math.clamp(n,min,max)/delta+0.5)*delta end
+            if n then C.config[key]=math.floor(math.clamp(n,minV,maxV)/step+.5)*step end
             field.Text=tostring(C.config[key])
         end)
     end
-    switch(pages.FARM,"Auto Collect","autoCollect")
-    switch(pages.FARM,"Auto Sell","autoSell")
-    switch(pages.FARM,"Sell after each tree","sellAfterTree")
-    switch(pages.FARM,"Sell when full","sellWhenFull")
-    switch(pages.FARM,"Golden Tree priority","goldFirst")
-    options(pages.FARM,"Attack", "attackMode", {"Input","Experimental Remote"})
-    options(pages.FARM,"Tool slot","toolSlot",{"2","1","Auto"})
+    local function notice(page,text)
+        obj("TextLabel",{Size=UDim2.new(1,-9,0,45),BackgroundTransparency=1,
+            Text=text,TextWrapped=true,TextXAlignment=Enum.TextXAlignment.Left,
+            TextYAlignment=Enum.TextYAlignment.Top,Font=Enum.Font.Gotham,
+            TextColor3=colors.muted,TextSize=11},page)
+    end
+    toggle(pages.FARM,"Auto Collect","autoCollect")
+    toggle(pages.FARM,"Auto Sell","autoSell")
+    toggle(pages.FARM,"Sell after each tree","sellAfterTree")
+    toggle(pages.FARM,"Sell at full bag","sellWhenFull")
+    toggle(pages.FARM,"Prioritize Golden","goldFirst")
+    options(pages.FARM,"Tree attack","attackMode",{"Input","Experimental Remote"})
+    options(pages.FARM,"Tree tool slot","toolSlot",{"2","1","Auto"})
+    notice(pages.FARM,"Pickup: real mouse click, requires backpack count increase. No silent fake successes.")
     options(pages.MOVE,"Movement","mode",{"Walk","Step TP","Instant TP"})
-    number(pages.MOVE,"Step TP speed", "stepSpeed",8,180,2)
-    number(pages.MOVE,"Attack delay (s)","attackDelay",0.45,3,0.05)
-    number(pages.MOVE,"Distance from tree","hitDistance",2.5,6,0.1)
-    number(pages.MOVE,"Max tree distance","maxTreeDistance",25,1500,5)
-    options(pages.MOVE,"Area","selectedArea",{"Current","1","2","3","4","5","6","7","8","All"})
-    number(pages.OPTIONS,"Failures per target","maxFailures",1,8,1)
-    switch(pages.OPTIONS,"Target highlight","showTree")
-    switch(pages.OPTIONS,"Log highlights","showLogs")
-    new("TextLabel",{Size=UDim2.new(1,-7,0,45),BackgroundTransparency=1,TextWrapped=true,
-        Text="Walk uses Pathfinding. Step TP and Instant TP can be reset by the server.\nExperimental Remote uses an unverified sequence.",
-        Font=Enum.Font.Gotham,TextColor3=colors.secondary,TextSize=11},pages.OPTIONS)
-    local dbg=new("TextLabel",{Size=UDim2.new(1,-7,0,194),BackgroundColor3=colors.panel,
-        TextColor3=colors.secondary,TextSize=12,Font=Enum.Font.Code,TextXAlignment=Enum.TextXAlignment.Left,
-        TextYAlignment=Enum.TextYAlignment.Top,TextWrapped=true},pages.DEBUG)
-    rounded(dbg,7)
-    local info = new("TextLabel",{Position=UDim2.new(0,15,1,-63),Size=UDim2.new(1,-30,0,25),
-        BackgroundTransparency=1,Text="Idle",TextColor3=colors.secondary,Font=Enum.Font.Gotham,TextSize=11,
-        TextXAlignment=Enum.TextXAlignment.Left},main)
-    local start=action(main,"Start","START",UDim2.new(0,12,1,-38),UDim2.new(.45,-16,0,31),colors.green,function()
+    number(pages.MOVE,"TP step speed","stepSpeed",8,180,2)
+    number(pages.MOVE,"Tree attack delay","attackDelay",.45,3,.05)
+    number(pages.MOVE,"Tree hit distance","hitDistance",2.5,6,.1)
+    number(pages.MOVE,"Search trees within","maxTreeDistance",25,1500,5)
+    options(pages.MOVE,"Area","selectedArea",{"Current","All","1","2","3","4","5","6","7","8"})
+    number(pages.MOVE,"Pickup approach","pickupDistance",2.5,7,.1)
+    number(pages.MOVE,"Pickup delay","pickupDelay",.15,1,.05)
+    number(pages.MOVE,"Pickup retries","pickupRetries",1,5,1)
+    toggle(pages.COMBAT,"Auto Combat","autoCombat")
+    options(pages.COMBAT,"Combat mode","combatMode",{"Defend","Hunt"})
+    options(pages.COMBAT,"Priority","combatPriority",{"Threats","Combat","Trees"})
+    options(pages.COMBAT,"Combat tool slot","combatTool",{"2","1","Auto"})
+    number(pages.COMBAT,"Attack distance","combatReach",3,10,.5)
+    number(pages.COMBAT,"Enemy search range","combatSearch",15,350,5)
+    number(pages.COMBAT,"Combat hit delay","combatDelay",.35,2,.05)
+    number(pages.COMBAT,"Stop when HP <=","combatHealth",5,90,1)
+    toggle(pages.COMBAT,"Highlight target","showMobs")
+    toggle(pages.EVENT,"Graveyard trees only","eventOnly")
+    toggle(pages.EVENT,"Graveyard mobs only","eventMobs")
+    notice(pages.EVENT,"Mobs auto-detected by MonsterId, Monster, HP, MaxHP and State. Guardians (bosses) get priority. No name whitelist.")
+    local eventLabel=obj("TextLabel",{Size=UDim2.new(1,-7,0,46),Text="Event scan...",
+        TextColor3=colors.muted,Font=Enum.Font.Code,TextSize=12,
+        TextXAlignment=Enum.TextXAlignment.Left,BackgroundColor3=colors.panel},pages.EVENT)
+    round(eventLabel,7)
+    number(pages.CONFIG,"Tree failures limit","maxFailures",1,8,1)
+    toggle(pages.CONFIG,"Highlight tree","showTree")
+    toggle(pages.CONFIG,"Highlight logs","showLogs")
+    notice(pages.CONFIG,"The server can reject teleport or attacks. Experimental Remote is unverified; Input is recommended.")
+    local debug=round(obj("TextLabel",{Size=UDim2.new(1,-7,0,235),
+        BackgroundColor3=colors.panel,TextColor3=colors.muted,
+        Text="No events yet",Font=Enum.Font.Code,TextSize=12,TextWrapped=true,
+        TextXAlignment=Enum.TextXAlignment.Left,TextYAlignment=Enum.TextYAlignment.Top},pages.DEBUG),7)
+    local status=obj("TextLabel",{Position=UDim2.fromOffset(15,height-48-75),
+        Size=UDim2.new(1,-30,0,33),Text="IDLE",BackgroundTransparency=1,
+        TextXAlignment=Enum.TextXAlignment.Left,Font=Enum.Font.Gotham,
+        TextColor3=colors.muted,TextSize=11},content)
+    local start=button(content,"START",12,height-48-37,195,31,colors.green,function()
         if C.running then C:stop() else C:start() end
     end)
-    action(main,"Export","EXPORT JSON",UDim2.new(.46,0,1,-38),UDim2.new(.28,-6,0,31),colors.accent,function()
-        local ok, out=C:export()
-        C:note(ok and "info" or "error",out)
+    button(content,"EXPORT",216,height-48-37,102,31,colors.accent,function()
+        local ok,msg=C:export()
+        C:note(ok and "info" or "error",msg)
     end)
-    action(main,"Unload","UNLOAD",UDim2.new(.75,0,1,-38),UDim2.new(.25,-12,0,31),colors.red,function() C:unload() end)
-    local dragging, dragStart, origin=false,nil,nil
+    button(content,"UNLOAD",326,height-48-37,116,31,colors.red,function() C:unload() end)
+    local drag,point,origin=false,nil,nil
     C:connect(head.InputBegan,function(input)
         if input.UserInputType==Enum.UserInputType.MouseButton1 then
-            dragging=true; dragStart=input.Position; origin=main.Position
+            drag=true;point=input.Position;origin=panel.Position
         end
     end)
     C:connect(head.InputEnded,function(input)
-        if input.UserInputType==Enum.UserInputType.MouseButton1 then dragging=false end
+        if input.UserInputType==Enum.UserInputType.MouseButton1 then drag=false end
     end)
     C:connect(C.uid.InputChanged,function(input)
-        if dragging and input.UserInputType==Enum.UserInputType.MouseMovement then
-            local d=input.Position-dragStart
-            main.Position=UDim2.new(origin.X.Scale,origin.X.Offset+d.X,origin.Y.Scale,origin.Y.Offset+d.Y)
+        if drag and input.UserInputType==Enum.UserInputType.MouseMovement then
+            local d=input.Position-point
+            panel.Position=UDim2.new(origin.X.Scale,origin.X.Offset+d.X,origin.Y.Scale,origin.Y.Offset+d.Y)
         end
     end)
-    local acc=0
+    local accumulator=0
     C:connect(game:GetService("RunService").Heartbeat,function(dt)
         if not C.alive then return end
-        acc=acc+dt
-        if acc<.4 then return end
-        acc=0
+        accumulator=accumulator+dt
+        if accumulator<.45 then return end
+        accumulator=0
         start.Text=C.running and "STOP" or "START"
         start.BackgroundColor3=C.running and colors.red or colors.green
         local bag,cap=C:backpack()
-        info.Text=C.stage.."  |  Bag "..tostring(bag or "?").."/"..tostring(cap or "?")
-            .."  |  Trees "..C.stats.felled.."  |  Sold "..C.stats.sold
-        local last={}
-        for i=math.max(1,#C.logs-9),#C.logs do
-            local v=C.logs[i]
-            if v then table.insert(last,(v.level or "").."  "..v.message) end
+        status.Text=string.format("%s  |  BAG %s/%s  |  TREES %d  |  LOGS %d  |  KILLS %d",
+            C.stage,tostring(bag or "?"),tostring(cap or "?"),C.stats.felled,
+            C.stats.pickups,C.stats.mobKills)
+        local recent={}
+        for i=math.max(1,#C.logs-10),#C.logs do
+            if C.logs[i] then table.insert(recent,C.logs[i].level.."  "..C.logs[i].message) end
         end
-        dbg.Text=table.concat(last,"\n")
+        debug.Text=table.concat(recent,"\n")
+        local event=C:eventInfo()
+        eventLabel.Text=string.format("AREA: %s\nTIME: %.1f  |  MOBS: %d  |  BOSSES: %d",
+            event.areaName or "?",event.clock,event.minions,event.bosses)
     end)
 end

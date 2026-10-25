@@ -39,9 +39,11 @@ return function(C)
         end
         return false
     end
-    function C:chooseTool()
-        if self.config.toolSlot == "Auto" then return end
-        local n = tonumber(self.config.toolSlot)
+    C.click = function(self) return clickMouse() end
+    function C:chooseTool(slot)
+        slot = slot or self.config.toolSlot
+        if slot == "Auto" then return end
+        local n = tonumber(slot)
         if not n then return end
         if type(keypress) == "function" and type(keyrelease) == "function" then
             local vkey = 0x30 + n

@@ -19,6 +19,7 @@ return function(C)
             root.CFrame = CFrame.new(p) * root.CFrame.Rotation
             task.wait(0.24)
             return self.running and token == self.motionToken
+                and (root.Position - p).Magnitude <= math.max(stopAt or 3, 5.5)
         elseif mode == "Step TP" then
             local last = root.Position
             local dist = (p - last).Magnitude
@@ -29,7 +30,8 @@ return function(C)
                 root.CFrame = CFrame.new(nextPos) * root.CFrame.Rotation
                 task.wait(0.08)
             end
-            return self.running
+            return self.running and token == self.motionToken
+                and (root.Position - p).Magnitude <= math.max(stopAt or 3, 6)
         end
         local function moveToPoint(v)
             hum:MoveTo(v)
