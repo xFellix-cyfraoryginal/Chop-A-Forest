@@ -98,6 +98,14 @@ return function(C)
         self.running = false
         self.session = self.session + 1
         self:cancelMove()
+        if self.skyHoldPosition and self.skyLanding then
+            local _,root=self:character()
+            if root then
+                root.CFrame=CFrame.new(self.skyLanding)*root.CFrame.Rotation
+                root.AssemblyLinearVelocity=Vector3.zero
+            end
+        end
+        self.skyHoldPosition,self.skyLanding=nil,nil
         self.stage = 'STOPPED'
         self:note('Stopped (F8 / button)')
     end

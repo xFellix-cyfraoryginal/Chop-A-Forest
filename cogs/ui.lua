@@ -21,7 +21,7 @@ return function(C)
         local ok,custom=pcall(gethui)
         if ok and custom then parent=custom end
     end
-    local gui=make('ScreenGui',{Name='CAF_GlobalHunt_V4_2',ResetOnSpawn=false,
+    local gui=make('ScreenGui',{Name='CAF_SafeRetreat_V4_3',ResetOnSpawn=false,
         IgnoreGuiInset=true,ZIndexBehavior=Enum.ZIndexBehavior.Sibling},parent)
     C.gui=gui
     local panel=round(make('Frame',{Size=UDim2.fromOffset(394,382),
@@ -30,7 +30,7 @@ return function(C)
     local top=round(make('Frame',{Size=UDim2.new(1,0,0,48),
         BackgroundColor3=surface,BorderSizePixel=0},panel),12)
     make('TextLabel',{Size=UDim2.new(1,-92,1,0),Position=UDim2.fromOffset(13,0),
-        BackgroundTransparency=1,Text='CHOP A FOREST  /  GLOBAL HUNT V4.2',TextSize=14,
+        BackgroundTransparency=1,Text='CHOP A FOREST  /  SAFE RETREAT V4.3',TextSize=14,
         Font=Enum.Font.GothamBold,TextColor3=ink,TextXAlignment=Enum.TextXAlignment.Left},top)
     local function button(parent,text,y,height,color,clicked)
         local b=round(make('TextButton',{Size=UDim2.new(1,-20,0,height or 37),
@@ -123,19 +123,19 @@ return function(C)
         C.cfg.useExperimental=not C.cfg.useExperimental
         exp.Text='Unverified tools: '..(C.cfg.useExperimental and 'ON' or 'OFF')
     end)
-    local holdBtn=button(tools,'HP Pause: ON (6s at <=40%)',187,34,surface,function() end)
+    local holdBtn=button(tools,'HP Retreat: ON (6s at <=40%)',187,34,surface,function() end)
     C:connect(holdBtn.MouseButton1Click,function()
         C.cfg.hpPause=not C.cfg.hpPause
-        holdBtn.Text='HP Pause: '..(C.cfg.hpPause and 'ON' or 'OFF')
+        holdBtn.Text='HP Retreat: '..(C.cfg.hpPause and 'ON' or 'OFF')
             ..' ('..C.cfg.pauseSeconds..'s at <=40%)'
     end)
-    local durationBtn=button(tools,'Pause duration: 6 seconds',227,34,surface,function() end)
+    local durationBtn=button(tools,'Shelter duration: 6 seconds',227,34,surface,function() end)
     C:connect(durationBtn.MouseButton1Click,function()
         local values={4,6,8,10}
         local i=table.find(values,C.cfg.pauseSeconds) or 2
         C.cfg.pauseSeconds=values[i%#values+1]
-        durationBtn.Text='Pause duration: '..C.cfg.pauseSeconds..' seconds'
-        holdBtn.Text='HP Pause: '..(C.cfg.hpPause and 'ON' or 'OFF')
+        durationBtn.Text='Shelter duration: '..C.cfg.pauseSeconds..' seconds'
+        holdBtn.Text='HP Retreat: '..(C.cfg.hpPause and 'ON' or 'OFF')
             ..' ('..C.cfg.pauseSeconds..'s at <=40%)'
     end)
     local debug=pages.DEBUG
@@ -191,8 +191,8 @@ return function(C)
             runButton.BackgroundColor3=C.running and red or green
             local info=C.treeScan or {}
             local threats=C:threats(C:position(),math.huge)
-            debugInfo.Text=string.format('Trees %d/%d  |  Mobs %d  |  Chopped %d  |  Kills %d',
-                info.valid or 0,info.cached or 0,threats,C.stats.trees,C.stats.kills)
+            debugInfo.Text=string.format('Trees %d/%d  |  Mobs %d  |  Kills %d  |  Axe %.2fs',
+                info.valid or 0,info.cached or 0,threats,C.stats.kills,C.axeDelay or .33)
             task.wait(.65)
         end
     end)

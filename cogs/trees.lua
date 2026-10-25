@@ -31,6 +31,10 @@ return function(C)
                     end
                     task.wait(.07)
                 end
+                local profile=self:activeProfile()
+                if profile=='Axe' and self.learnAxeHit then
+                    self:learnAxeHit(changed)
+                end
                 if changed then failed=0 else failed=failed+1 end
             end
             swings=swings+1

@@ -25,6 +25,16 @@ return function(C)
             if not self:sellBag() then task.wait(.25) end
             return
         end
+        -- Right after an HP retreat, briefly prioritize a safe tree over
+        -- dangerous old pickup locations. The wood registry stays intact.
+        local hp,maxHP=self:health()
+        if self.cfg.priority=='FARM' and hp/math.max(maxHP,1)<.66
+            and self.safeTree and os.clock()<(self.safeTreeUntil or 0)
+            and self:treeValid(self.safeTree) then
+            self.stage='TREE: quiet-area recovery'
+            self:chopTree(self.safeTree)
+            return
+        end
         local wood,ready=self:woodCounts()
         if self.cfg.collect and wood>0 then
             local log=self:chooseWood()
@@ -76,9 +86,11 @@ return function(C)
         self.running=true; self.session=self.session+1
         self.panic=false; self.lastHP=nil
         self.hpHoldUntil=0; self.retaliateUntil=0; self.pendingHold=false
+        self.lastHoldAt=-100; self.skyHoldPosition=nil; self.skyLanding=nil
+        self.safeTree=nil; self.safeTreeUntil=0
         local session=self.session
         self.stage='STARTING'
-        self:note('V4.2 GLOBAL '..self.cfg.priority..' FIRST / '..self.cfg.move)
+        self:note('V4.3 SAFE RETREAT '..self.cfg.priority..' FIRST / '..self.cfg.move)
         task.spawn(function() self:watchSafety(session) end)
         task.spawn(function() self:workLoop(session) end)
     end

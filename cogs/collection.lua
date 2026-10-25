@@ -1,3 +1,4 @@
+-- V4.3: E first, mouse click fallback; confirmation is backpack delta.
 return function(C)
     function C:collectOne(log)
         local job=self.wood[log]
@@ -9,48 +10,65 @@ return function(C)
         if not at then return false end
         self.stage='WOOD: approaching'
         if not self:goTo(at,self.cfg.pickupRange) then
-            job.nextTry=os.clock()+2.5
+            job.nextTry=os.clock()+2.5; return false
+        end
+        if self:isPaused() or self:urgentCombat() or log.Parent~=self.logsFolder then
             return false
         end
-        if self:isPaused() or self:urgentCombat() or log.Parent~=self.logsFolder then return false end
-        self.stage='WOOD: collecting'
+        self.stage='WOOD: E pickup'
         local success=false
         for attempt=1,2 do
             if not self.running or self:isPaused() or self:urgentCombat() or job.done then break end
             local before=self:backpack()
             if not before or before>=cap then break end
-            local updatedAt=self:woodPosition(log)
-            if updatedAt then at=updatedAt end
-            local sent,reason=self:useItem(at,'Pickup')
-            if not sent then
-                self:note(reason or 'Could not trigger pickup')
-                break
-            end
-            local deadline=os.clock()+.75
-            while self.running and not self:isPaused() and not self:urgentCombat() and os.clock()<deadline do
-                local after=self:backpack()
-                if after and after>before then success=true; break end
-                if log.Parent~=self.logsFolder then break end
-                task.wait(.055)
-            end
-            if success or log.Parent~=self.logsFolder then break end
-            if attempt==1 then
-                local _,root=self:character()
-                if root then
-                    local direction=at-root.Position
-                    if direction.Magnitude>2.4 then self:goTo(at,2.4) end
+            local p=self:woodPosition(log)
+            if p then at=p end
+            -- Try the interact key first. It doesn't trigger an axe animation.
+            local sent=self:useItem(at,'Pickup')
+            if sent then
+                local deadline=os.clock()+.30
+                while self.running and not self:isPaused() and os.clock()<deadline do
+                    local after=self:backpack()
+                    if after and after>before then success=true; break end
+                    if log.Parent~=self.logsFolder then break end
+                    task.wait(.035)
                 end
             end
+            if success or log.Parent~=self.logsFolder then break end
+            -- If E wasn't handled by this game/executor, fall back to a click.
+            self.stage='WOOD: click fallback'
+            local ok=self:useItem(at,'PickupClick')
+            if ok then
+                local deadline=os.clock()+.48
+                while self.running and not self:isPaused() and os.clock()<deadline do
+                    local after=self:backpack()
+                    if after and after>before then success=true; break end
+                    if log.Parent~=self.logsFolder then break end
+                    task.wait(.045)
+                end
+            end
+            if success or log.Parent~=self.logsFolder then break end
+            if attempt==1 then self:goTo(at,2.5) end
         end
         if success then
-            job.done=true
             self.stats.collected=self.stats.collected+1
-            self:note('Pickup confirmed by backpack')
+            -- E sometimes takes the NEAREST log, not necessarily our chosen
+            -- log. Never discard the chosen one while it's still in Workspace.
+            if log.Parent==self.logsFolder then
+                job.nextTry=os.clock()+.5
+                self:note('Pickup +1, target log still present; retry queued')
+            else
+                job.done=true
+                self:note('E pickup confirmed')
+            end
             return true
         end
-        -- Do NOT delete job on failed pickup or danger; retry later.
+        if log.Parent~=self.logsFolder then
+            return true -- Model was removed, probably collected by somebody.
+        end
         job.failures=job.failures+1
-        job.nextTry=os.clock()+math.min(22,2.5+job.failures*2)
+        job.nextTry=os.clock()+math.min(18,1.5+job.failures*1.5)
+        self:note('Pickup failed; wood remains in queue')
         return false
     end
     function C:sellBag()
@@ -59,7 +77,7 @@ return function(C)
         if not self.sellSpot then
             self:note('SellSpot missing'); return false
         end
-        self.stage='SELL: walking'
+        self.stage='SELL: approaching'
         local pad=self.sellSpot:FindFirstChild('DepositPad',true)
         local point=pad and pad:IsA('BasePart') and pad.Position
         if not point then
@@ -70,7 +88,8 @@ return function(C)
         if not self:goTo(point,3.3) then return false end
         self.stage='SELL: depositing'
         local deadline=os.clock()+2.5
-        while self.running and not self:isPaused() and not self:urgentCombat() and os.clock()<deadline do
+        while self.running and not self:isPaused() and not self:urgentCombat()
+            and os.clock()<deadline do
             local after=self:backpack()
             if after and after<before then
                 self.stats.sold=self.stats.sold+(before-after)
@@ -79,10 +98,11 @@ return function(C)
             end
             task.wait(.09)
         end
-        local ok=self:useItem(point,'Pickup')
+        -- A regular click is the last fallback; E is reserved for LOG pickup.
+        local ok=self:useItem(point,'Deposit')
         if ok then
-            local endAt=os.clock()+1.2
-            while self.running and not self:isPaused() and not self:urgentCombat() and os.clock()<endAt do
+            local untilAt=os.clock()+1.1
+            while self.running and not self:isPaused() and os.clock()<untilAt do
                 local after=self:backpack()
                 if after and after<before then
                     self.stats.sold=self.stats.sold+(before-after)
@@ -91,7 +111,7 @@ return function(C)
                 task.wait(.08)
             end
         end
-        self:note('Sell not confirmed (will retry)')
+        self:note('Sell not confirmed (retry later)')
         return false
     end
 end

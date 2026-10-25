@@ -1,8 +1,44 @@
 return function(C)
     C.pressedMouse = false
+    C.axeDelay = .33 -- Adaptive; tree HP feedback can lower this after upgrades.
+    C.axeStreak, C.axeMisses = 0, 0
     local function getVIM()
         local ok, service = pcall(function() return game:GetService('VirtualInputManager') end)
         if ok then return service end
+    end
+    function C:tapKey(code, virtualCode)
+        local vim=getVIM()
+        if vim then
+            local ok=pcall(function()
+                vim:SendKeyEvent(true,code,false,game)
+                task.wait(.045)
+                vim:SendKeyEvent(false,code,false,game)
+            end)
+            if ok then return true end
+        end
+        if type(keypress)=='function' and type(keyrelease)=='function' then
+            return pcall(function()
+                keypress(virtualCode); task.wait(.045); keyrelease(virtualCode)
+            end)
+        end
+        return false
+    end
+    function C:learnAxeHit(confirmed)
+        if confirmed then
+            self.axeStreak=self.axeStreak+1
+            self.axeMisses=0
+            -- Server accepted the swing: gradually test faster timing.
+            if self.axeStreak>=2 then
+                self.axeDelay=math.max(.135,self.axeDelay-.017)
+            end
+        else
+            self.axeStreak=0
+            self.axeMisses=self.axeMisses+1
+            if self.axeMisses>=2 then
+                self.axeDelay=math.min(.85,self.axeDelay+.055)
+                self.axeMisses=0
+            end
+        end
     end
     function C:releaseMouse()
         if not self.pressedMouse then return end
@@ -97,13 +133,20 @@ return function(C)
         return false
     end
     function C:toolCooldown(profile, held)
-        local base=profile=='Fists' and .50 or profile=='Pistol' and .34 or .60
+        local base=profile=='Fists' and .50 or profile=='Pistol' and .34 or .58
+        if profile=='Axe' then base=self.axeDelay or .33 end
         if profile=='Chainsaw' or profile=='Vacuum' then base=.54 end
         if held then
-            for _, key in ipairs({'AttackCooldown','SwingCooldown','Cooldown','AttackDelay'}) do
+            for _,key in ipairs({'AttackCooldown','SwingCooldown','Cooldown','AttackDelay'}) do
                 local num=held:GetAttribute(key)
-                if type(num)=='number' and num>=.12 and num<4 then
-                    base=math.max(base,num); break
+                if type(num)=='number' and num>=.08 and num<4 then
+                    -- A faster upgraded weapon must never be clamped to .60.
+                    if profile=='Axe' then
+                        base=math.min(base,math.clamp(num,.10,3.99))
+                    else
+                        base=math.clamp(num,.10,3.99)
+                    end
+                    break
                 end
             end
         end
@@ -114,10 +157,26 @@ return function(C)
         if purpose~='Combat' and self:urgentCombat() then
             return false,'Retaliating against mob'
         end
+        -- E picks up logs without swinging the equipped axe. Do not
+        -- change tool slots or aim the camera when collecting.
+        if purpose=='Pickup' then
+            local now=os.clock()
+            local nextAt=math.max(self.pickupKeyAt or 0,self.lastInputAt or 0)
+            while self.running and not self:isPaused() and now<nextAt do
+                task.wait(math.min(.05,nextAt-now)); now=os.clock()
+            end
+            if not self.running or self:isPaused() then return false,'Interrupted' end
+            local sent=self:tapKey(Enum.KeyCode.E,0x45)
+            if sent then
+                self.pickupKeyAt=os.clock()+.13
+                self.lastInputAt=os.clock()+.095
+            end
+            return sent, sent and nil or 'Executor did not accept E input'
+        end
         local profile, held = self:activeProfile()
         -- In Auto, prefer the verified Axe for tree work, pickup and melee.
         if self.cfg.tool=='Auto' then
-            local needsAxe=(purpose=='Pickup' and profile~='Axe')
+            local needsAxe=((purpose=='PickupClick' or purpose=='Deposit') and profile~='Axe')
                 or (purpose=='Tree' and (profile=='Fists' or profile=='Pistol'
                     or profile=='Vacuum'))
                 or (purpose=='Combat' and profile=='Fists')
@@ -133,13 +192,13 @@ return function(C)
         if purpose=='Combat' and profile=='Vacuum' then
             return false, 'Vacuum is not combat gear'
         end
-        if purpose=='Pickup' and profile=='Pistol' then
+        if purpose=='PickupClick' and profile=='Pistol' then
             return false, 'Pistol cannot pick logs'
         end
-        if purpose=='Pickup' and profile=='Chainsaw' then
+        if purpose=='PickupClick' and profile=='Chainsaw' then
             return false, 'Chainsaw pickup unverified'
         end
-        if purpose=='Pickup' and profile=='Vacuum' and not self.cfg.useExperimental then
+        if purpose=='PickupClick' and profile=='Vacuum' and not self.cfg.useExperimental then
             return false, 'Vacuum beta disabled'
         end
         if (profile=='Chainsaw' or profile=='Vacuum' or profile=='Pistol')
@@ -173,12 +232,12 @@ return function(C)
         end
         if not self.running or self:isPaused() then return false end
         local worked
-        if profile=='Chainsaw' or (profile=='Vacuum' and purpose=='Pickup') then
+        if profile=='Chainsaw' or (profile=='Vacuum' and purpose=='PickupClick') then
             worked=self:hold(.40)
         else worked=self:tap() end
         if worked then
             self.toolAt[key]=os.clock()+self:toolCooldown(profile,held)
-            self.lastInputAt=os.clock()+.15
+            self.lastInputAt=os.clock()+.11
         end
         return worked
     end

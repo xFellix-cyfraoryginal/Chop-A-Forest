@@ -100,6 +100,8 @@ return function(C)
     end
     function C:chooseTree()
         self:scanTrees(false)
+        if self.safeTree and os.clock() < (self.safeTreeUntil or 0)
+            and self:treeValid(self.safeTree) then return self.safeTree end
         if self.workTree and self:treeValid(self.workTree) then return self.workTree end
         local from=self:position()
         if not from then return nil end
