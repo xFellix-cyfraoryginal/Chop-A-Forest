@@ -1,7 +1,7 @@
--- Chop-A-Forest | FARM + MOBS V4.8.3 | github.com/xFellix-cyfraoryginal/Chop-A-Forest
+-- Chop-A-Forest | FARM + MOBS V4.8.4 | github.com/xFellix-cyfraoryginal/Chop-A-Forest
 -- All Lua/Luau, no build step. Upload main.lua and cogs/ together.
 local BASE = 'https://raw.githubusercontent.com/xFellix-cyfraoryginal/Chop-A-Forest/main/'
-local VERSION = '4.8.3'
+local VERSION = '4.8.4'
 local FILES = {
     'core', 'world', 'navigation', 'hover', 'tools', 'claws', 'survival',
     'trees', 'collection', 'combat', 'dodge',

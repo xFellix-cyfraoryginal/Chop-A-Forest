@@ -88,15 +88,16 @@ return function(C)
         self:note('Pickup failed; wood remains in queue')
         return false
     end
-    -- V4.8.3: Stand ON DepositPad for three full seconds, then return to work.
-    -- HUD 0/30 alone is NOT a server-confirmed sale. Never pick up new logs
-    -- until a credit + empty bag is observed (avoids server-side Bag Full).
+    -- V4.8.4: Restore the original V4.8.0 long-dwell DepositPad routine.
+    -- Full 9 seconds minimum, up to 13.5 seconds for delayed settlement.
+    -- If the bag does not start draining after 2.1 seconds, click the pad ONCE.
+    -- Leave pickup locked on failed/uncertain sales, never trust a transient 0/30.
     local function readCash(self)
         local stats=self.player:FindFirstChild('leaderstats')
         local cash=stats and stats:FindFirstChild('Cash')
-        return cash and tonumber(cash.Value) or nil,cash
+        return cash and tonumber(cash.Value) or nil
     end
-    local function earned(self)
+    local function readEarned(self)
         return tonumber(self.player:GetAttribute('Stat_CashEarned'))
     end
     function C:findSellPad()
@@ -119,53 +120,13 @@ return function(C)
         end
         return best
     end
-    -- Listen for cash credits even if Auto Claws Speed immediately spends them.
-    -- Install this listener ONCE; avoid one connection per sale.
-    function C:watchSaleCredit()
-        local _,cash=readCash(self)
-        if not cash or self.saleCashObject==cash then return end
-        self.saleCashObject=cash
-        self:connect(cash:GetPropertyChangedSignal('Value'),function()
-            if self.saleCashObject~=cash then return end
-            local sale=self.salePending
-            if not sale then return end
-            local amount=tonumber(cash.Value)
-            if amount and sale.lastCash and amount>sale.lastCash then
-                sale.credited=true
-            end
-            sale.lastCash=amount
-        end)
-    end
+    -- Scheduler from 4.8.2 calls this at the beginning of each workStep.
+    -- Do NOT release the lock there: the full pad dwell owns settlement.
     function C:reconcileSale()
-        local sale=self.salePending
-        if not sale then return false end
-        local bag=self:backpack()
-        local carrying=tonumber(self.player:GetAttribute('CarriedLogs')) or 0
-        local cash=readCash(self)
-        local totalEarned=earned(self)
-        if cash and sale.cash and cash>sale.cash then sale.credited=true end
-        if totalEarned and sale.earned and totalEarned>sale.earned then
-            sale.credited=true
-        end
-        -- A zero counter without server credit is NOT confirmation.
-        if sale.credited and bag==0 and carrying==0 then
-            self.stats.sold=self.stats.sold+sale.before
-            self.sellAudit=self.sellAudit or {}
-            local audit=self.sellAudit
-            audit[#audit+1]={status='paid_and_empty',bagBefore=sale.before,
-                bagAfter=bag,cashBefore=sale.cash,cashAfter=cash,
-                seconds=math.floor((os.clock()-sale.at)*10)/10,
-                visits=sale.visits}
-            if #audit>20 then table.remove(audit,1) end
-            self.salePending=nil
-            self.pickupUnblockAt=os.clock()+.25
-            self:note('SELL server confirmed: '..sale.before..' logs')
-            return true
-        end
         return false
     end
     function C:sellBag()
-        self:reconcileSale()
+        if not self.running or self:isPaused() then return false end
         local now=os.clock()
         local sale=self.salePending
         if sale and now<(sale.retryAt or 0) then return false end
@@ -173,56 +134,112 @@ return function(C)
         if not sale then
             local before=self:backpack()
             if not before or before<1 then return false end
-            local cash=readCash(self)
-            sale={at=now,before=before,cash=cash,lastCash=cash,
-                earned=earned(self),credited=false,visits=0,retryAt=0}
+            sale={before=before,at=now,visits=0,retryAt=0,
+                cash=readCash(self),earned=readEarned(self)}
             self.salePending=sale
         end
-        self:watchSaleCredit()
         local pad=self:findSellPad()
         if not pad then
-            self:note('SELL: DepositPad missing')
             sale.retryAt=os.clock()+2
+            self:note('SELL: DepositPad missing (retry)')
             return false
         end
-        -- V4.8.3 center-of-pad dwell is three seconds for server bag sync.
-        -- On Instant TP clear air hold so the avatar physically stays on pad.
-        self.stage='SELL: teleport to DepositPad'
         if self.clearWorkHover then self:clearWorkHover() end
         if self.disableAirHold then self:disableAirHold() end
+        if self.releaseMouse then self:releaseMouse() end
+        self.stage='SELL: center of DepositPad'
         local point=pad.Position
-        if not self:goTo(point,1.2) then
+        if not self:goTo(point,.65) then
             sale.retryAt=os.clock()+.7
             return false
         end
         sale.visits=sale.visits+1
-        local position=self:ground(point) or (point+Vector3.new(0,3.15,0))
-        local endAt=os.clock()+3.0
-        self.stage='SELL: standing on pad (3.0s)'
+        local started=os.clock()
+        local deadline=started+13.5
+        local firstZero=nil
+        local lowest=sale.before
+        local clicked=false
+        local cashStart=readCash(self)
+        local lastCash,lastCashAt=cashStart,started
+        local lastCenter=started
+        local standPos=self:ground(point) or (point+Vector3.new(0,3.15,0))
+        local function finish(status,after,cash)
+            self.sellAudit=self.sellAudit or {}
+            local audit=self.sellAudit
+            audit[#audit+1]={status=status,bagBefore=sale.before,
+                bagAfter=after,cashBefore=sale.cash,cashAfter=cash,
+                earnedBefore=sale.earned,earnedAfter=readEarned(self),
+                seconds=math.floor((os.clock()-started)*10+.5)/10,
+                visits=sale.visits,clicked=clicked}
+            if #audit>20 then table.remove(audit,1) end
+            self.stats.sold=self.stats.sold+sale.before
+            self.salePending=nil
+            self.pickupUnblockAt=os.clock()+.5
+            self:note('SELL: 9s collector settled '..tostring(sale.before)
+                ..' logs ('..status..')')
+            return true
+        end
+        self.stage='SELL: original 9s dwell (max 13.5s)'
         while self.running and self.live and not self:isPaused()
-            and pad.Parent and os.clock()<endAt do
+            and not self:urgentCombat() and pad.Parent and os.clock()<deadline do
+            local tick=os.clock()
+            -- Stay physically on the pad; the tree air-hover MUST remain off.
             local _,root,hum=self:character()
             if not root then break end
             if self.cfg.move=='Instant TP' then
-                -- Remain at pad center for full three seconds, not edge.
-                if (root.Position-position).Magnitude>0.6 then
-                    root.CFrame=CFrame.new(position)*root.CFrame.Rotation
+                if (root.Position-standPos).Magnitude>.8 then
+                    root.CFrame=CFrame.new(standPos)*root.CFrame.Rotation
                 end
                 root.AssemblyLinearVelocity=Vector3.zero
-            elseif hum then
-                hum:MoveTo(position)
+            elseif hum and tick-lastCenter>=.35 then
+                hum:MoveTo(standPos)
             end
-            self:reconcileSale()
-            task.wait(.05)
-        end
-        self:reconcileSale()
-        if self.salePending then
-            sale.retryAt=os.clock()+.85
-            if sale.visits==1 or sale.visits%3==0 then
-                self:note('SELL awaiting server credit; will revisit pad ('
-                    ..sale.visits..' visits)')
+            if tick-lastCenter>=.35 then lastCenter=tick end
+            local after=self:backpack()
+            if after then
+                lowest=math.min(lowest,after)
+                if after==0 then
+                    firstZero=firstZero or tick
+                else
+                    firstZero=nil -- HUD zero flickered: not settled
+                end
             end
+            local cash=readCash(self)
+            if cash and lastCash and cash~=lastCash then
+                lastCashAt=tick
+                lastCash=cash
+            end
+            -- Restored V4.8.0 fallback, also fixes 0->full HUD flicker.
+            -- Recheck CURRENT count, not the lowest historical count.
+            -- No click while carrying logs IN HANDS: LMB could throw them.
+            if not clicked and tick-started>=2.1
+                and after and after>=sale.before then
+                clicked=true
+                local _,ownsBag,carrying=self:equipmentStatus()
+                if ownsBag or (carrying or 0)==0 then
+                    self.stage='SELL: old Deposit click fallback'
+                    self:useItem(point,'Deposit')
+                else
+                    self:note('SELL: keeping held wood safe; pad touch only')
+                end
+                self.stage='SELL: original 9s dwell (max 13.5s)'
+            end
+            if after==0 and firstZero and tick-started>=9.0
+                and tick-firstZero>=3.5 and tick-lastCashAt>=1.2 then
+                return finish('stable_9s',after,cash)
+            end
+            task.wait(.12)
         end
-        return self.salePending==nil
+        local after=self:backpack()
+        if after==0 and firstZero and os.clock()-firstZero>=3.5
+            and os.clock()-started>=9.0 then
+            return finish('stable_timeout',after,readCash(self))
+        end
+        -- If a transient HUD zero is not a real sale, do not allow pickup.
+        -- The scheduler will retry the platform after a short backoff.
+        sale.retryAt=os.clock()+.75
+        self:note('SELL not settled ('..tostring(after)..'/'
+            ..tostring(sale.before)..'); retrying old 9s pad')
+        return false
     end
 end

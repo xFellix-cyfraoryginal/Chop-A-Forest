@@ -1,14 +1,15 @@
-# Chop-A-Forest V4.8.3 — Close Pumpkin / SellPad 3s / Live Trunk Aim
+# Chop-A-Forest V4.8.4 — Restore ORIGINAL 9-second selling
 
-PATCH ONLY over V4.8.2. Replace exactly these FIVE files:
-`main.lua`, `cogs/collection.lua`, `cogs/hover.lua`, `cogs/trees.lua`, `cogs/pumpkin.lua`.
+PATCH ONLY over V4.8.3. Replace only `main.lua` and `cogs/collection.lua`. Keep all other cog files unchanged.
 
-- PumpkinHead: center of real hitbox/model + ~1 stud side offset, almost the **same Y**, continuously repositions in Instant TP; adjusts angle on misses. Does NOT hover above head. Walk mode approaches normally.
-- Tree: both character facing and camera look at live trunk. The facing check is evaluated before a swing, and the final attack position is read AFTER weapon cooldown. No more stale aim during tree hops.
-- SellPad: 3 continuous seconds physically on the DepositPad instead of 1 second. Keep V4.8.2 cash+bag confirmation gate.
-- No change to Boss air orbit (Guardian), free Egg PickPrompt pickup, Auto Backpack, Claws Speed, Walk mode, or F6/F8.
+- Restores the older V4.8.0 DepositPad sale behavior: travel to real pad, stand there at least 9 seconds, allow 13.5 seconds for delayed server settlement.
+- Restores one DepositPad click fallback after 2.1 seconds if the bag stays full (or returns to full after a HUD flicker). No repeated click spam; no fallback LMB while hand-carrying wood.
+- Hold center position on the pad; disable tree/boss air hover for the entire sale.
+- Confirm HUD 0 stays stable for at least 3.5 seconds after reaching zero and the 9-second minimum completes.
+- Keep pickup locked while sale is unsettled; retry the pad, never treat a transient 0/30 as an instant empty bag.
+- Retains the 4.8.3 close PumpkinHead, real-time trunk aim, boss air fight, free egg pickup, backpack and Claws upgrades.
 
-Launcher:
-`loadstring(game:HttpGet("https://raw.githubusercontent.com/xFellix-cyfraoryginal/Chop-A-Forest/main/main.lua?v=4.8.3"))()`
+Run after uploading/committing:
+`loadstring(game:HttpGet("https://raw.githubusercontent.com/xFellix-cyfraoryginal/Chop-A-Forest/main/main.lua?v=4.8.4"))()`
 
-This patch is statically syntax-checked only; not executed in live Roblox. Export pistol observations using separate `CropForest_Pistol_Weapon_Logger_V13_RAW.lua`, not part of GitHub repo.
+Only syntax + static checks; not tested in live Roblox.
