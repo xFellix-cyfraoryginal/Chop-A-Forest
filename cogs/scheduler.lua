@@ -85,6 +85,26 @@ return function(C)
             task.wait(.20)
             return
         end
+        -- Prevent pickup on a fake HUD 0/30 while server still says FULL.
+        -- Between short pad visits, owned-backpack users may chop more trees
+        -- but nobody may collect logs until cash credit confirms the sale.
+        if self.salePending then
+            local sale=self.salePending
+            if os.clock()>=(sale.retryAt or 0) then
+                self:sellBag()
+            else
+                local _,bagOwned=self:equipmentStatus()
+                if bagOwned then
+                    self.stage='SELL: server sync; chopping meanwhile'
+                    local tree=self:chooseTree()
+                    if tree then self:chopTree(tree) else task.wait(.1) end
+                else
+                    self.stage='SELL: hand carry awaiting server'
+                    task.wait(.12)
+                end
+            end
+            return
+        end
         -- Only explicit MAX in the Clawman Attack Speed card (or lv 6)
         -- switches to TREE RUSH. Never collect/sell in this mode.
         if self.clawSpeedMax and self:clawSpeedMax() then
@@ -115,21 +135,6 @@ return function(C)
         local _,bagOwned,carried=self:equipmentStatus()
         local held=math.max(bag,carried or 0)
         local wood,ready=self:woodCounts()
-        local sale=self.salePending
-        if sale then
-            -- The sell input was sent. Reconcile independently; do not wait
-            -- on the pad or spam a second click while server processes it.
-            if not bagOwned and held>0 then
-                self.stage='SELL: hand carry awaiting confirmation'
-                task.wait(.10);return
-            end
-            if bagOwned and held>0 and held>=cap then
-                self.stage='SELL: payout pending; continuing tree chopping'
-                local nextTree=self:chooseTree()
-                if nextTree then self:chopTree(nextTree) else task.wait(.09) end
-                return
-            end
-        end
         if not bagOwned then
             -- No real backpack: HUD 0/5 (or 0/10) is HAND CARRY.
             -- Prepare one full load on the ground before clicking any log.
@@ -176,7 +181,7 @@ return function(C)
             self.stage='HANDS: waiting for full wood load'
             task.wait(.09);return
         end
-        -- Owned backpack: normal collect/sell loop, no station dwell.
+        -- Owned backpack: normal collect/sell loop; sale visits pad for one second.
         if self.cfg.sell and bag>=cap then
             self:sellBag();return
         end
@@ -228,10 +233,11 @@ return function(C)
         self.bossLock=nil
         self.salePending=nil
         self.nextSellTry=0
+        self.pickupUnblockAt=0
         self.handLogWaitSince=nil
         local session=self.session
         self.stage='STARTING'
-        self:note('V4.8.1 FARM/MOBS: farm='..tostring(self.cfg.farm)
+        self:note('V4.8.2 FARM/MOBS: farm='..tostring(self.cfg.farm)
             ..', kill='..tostring(self.cfg.combat))
         task.spawn(function() self:watchSafety(session) end)
         task.spawn(function() self:tryBuyClawsSpeed('start balance') end)

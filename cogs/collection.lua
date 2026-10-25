@@ -1,6 +1,8 @@
 -- V4.3: E first, mouse click fallback; confirmation is backpack delta.
 return function(C)
     function C:collectOne(log)
+        -- A HUD 0/30 is not proof the server cleared its bag.
+        if self.salePending or os.clock()<(self.pickupUnblockAt or 0) then return false end
         local job=self.wood[log]
         if not job or job.done or not self:woodReady(log,job) then return false end
         if self:isPaused() or self:urgentCombat()
@@ -86,12 +88,16 @@ return function(C)
         self:note('Pickup failed; wood remains in queue')
         return false
     end
-    -- V4.8.1: V7 confirmed center-screen LMB targeting DepositPad
-    -- resets held logs immediately. Never camp on the pad for 9 seconds.
+    -- V4.8.2: Stand ON DepositPad for one full second, then return to work.
+    -- HUD 0/30 alone is NOT a server-confirmed sale. Never pick up new logs
+    -- until a credit + empty bag is observed (avoids server-side Bag Full).
     local function readCash(self)
         local stats=self.player:FindFirstChild('leaderstats')
         local cash=stats and stats:FindFirstChild('Cash')
-        return cash and tonumber(cash.Value) or nil
+        return cash and tonumber(cash.Value) or nil,cash
+    end
+    local function earned(self)
+        return tonumber(self.player:GetAttribute('Stat_CashEarned'))
     end
     function C:findSellPad()
         local pads={}
@@ -113,83 +119,110 @@ return function(C)
         end
         return best
     end
+    -- Listen for cash credits even if Auto Claws Speed immediately spends them.
+    -- Install this listener ONCE; avoid one connection per sale.
+    function C:watchSaleCredit()
+        local _,cash=readCash(self)
+        if not cash or self.saleCashObject==cash then return end
+        self.saleCashObject=cash
+        self:connect(cash:GetPropertyChangedSignal('Value'),function()
+            if self.saleCashObject~=cash then return end
+            local sale=self.salePending
+            if not sale then return end
+            local amount=tonumber(cash.Value)
+            if amount and sale.lastCash and amount>sale.lastCash then
+                sale.credited=true
+            end
+            sale.lastCash=amount
+        end)
+    end
     function C:reconcileSale()
         local sale=self.salePending
         if not sale then return false end
         local bag=self:backpack()
         local carrying=tonumber(self.player:GetAttribute('CarriedLogs')) or 0
         local cash=readCash(self)
-        local cleared=(bag~=nil and bag<sale.before and
-            (carrying==0 or (tonumber(self.player:GetAttribute('Up_GearBackpack')) or 0)>0))
-        local paid=cash and sale.cash and cash>sale.cash
-        if cleared or paid then
-            local amount=math.max(0,sale.before-(bag or 0))
-            self.stats.sold=self.stats.sold+amount
+        local totalEarned=earned(self)
+        if cash and sale.cash and cash>sale.cash then sale.credited=true end
+        if totalEarned and sale.earned and totalEarned>sale.earned then
+            sale.credited=true
+        end
+        -- A zero counter without server credit is NOT confirmation.
+        if sale.credited and bag==0 and carrying==0 then
+            self.stats.sold=self.stats.sold+sale.before
             self.sellAudit=self.sellAudit or {}
             local audit=self.sellAudit
-            audit[#audit+1]={status=paid and 'paid' or 'bag_decreased',
-                bagBefore=sale.before,bagAfter=bag,cashBefore=sale.cash,
-                cashAfter=cash,seconds=math.floor((os.clock()-sale.at)*10)/10}
+            audit[#audit+1]={status='paid_and_empty',bagBefore=sale.before,
+                bagAfter=bag,cashBefore=sale.cash,cashAfter=cash,
+                seconds=math.floor((os.clock()-sale.at)*10)/10,
+                visits=sale.visits}
             if #audit>20 then table.remove(audit,1) end
             self.salePending=nil
-            self:note('SELL confirmed: '..amount..' logs')
+            self.pickupUnblockAt=os.clock()+.25
+            self:note('SELL server confirmed: '..sale.before..' logs')
             return true
-        end
-        if os.clock()-sale.at>=1.3 then
-            self.salePending=nil
-            self.nextSellTry=os.clock()+1.2
-            self:note('SELL not confirmed; will aim/click again')
         end
         return false
     end
     function C:sellBag()
         self:reconcileSale()
-        if self.salePending or os.clock()<(self.nextSellTry or 0) then return false end
-        local before=self:backpack()
-        if not before or before<1 then return false end
+        local now=os.clock()
+        local sale=self.salePending
+        if sale and now<(sale.retryAt or 0) then return false end
+        if not sale and now<(self.nextSellTry or 0) then return false end
+        if not sale then
+            local before=self:backpack()
+            if not before or before<1 then return false end
+            local cash=readCash(self)
+            sale={at=now,before=before,cash=cash,lastCash=cash,
+                earned=earned(self),credited=false,visits=0,retryAt=0}
+            self.salePending=sale
+        end
+        self:watchSaleCredit()
         local pad=self:findSellPad()
-        if not pad then self:note('DepositPad missing'); return false end
-        local point=pad.Position
-        local here=self:position()
-        if not here then return false end
-        local direction=Vector3.new(here.X-point.X,0,here.Z-point.Z)
-        if direction.Magnitude<.1 then direction=Vector3.new(1,0,0) end
-        -- V7: manual sale was confirmed from ~8 studs with rayHit DepositPad.
-        -- Approach the PAD EDGE, do not stand on its center.
-        -- If an obstacle blocked an earlier attempt, circle the edge.
-        local angle=math.rad((self.sellApproachIndex or 0)*80)
-        local unit=direction.Unit
-        local edge=Vector3.new(unit.X*math.cos(angle)-unit.Z*math.sin(angle),0,
-            unit.X*math.sin(angle)+unit.Z*math.cos(angle))
-        local stand=point+edge*7.1
-        self.stage='SELL: aim at deposit pad'
-        if not self:goTo(stand,2) then return false end
-        if not self.running or self:isPaused() or self:mobInterrupt() then return false end
-        -- Without a backpack, a miss may throw the held logs. Verify the
-        -- camera ray really sees the pad before sending a left-click.
-        local cam=self.ws.CurrentCamera
-        if not cam then return false end
-        self:aimAt(point)
-        local ray=cam.CFrame.LookVector
-        local exclude={self.player.Character}
-        local params=RaycastParams.new()
-        params.FilterType=Enum.RaycastFilterType.Exclude
-        params.FilterDescendantsInstances=exclude
-        local hit=self.ws:Raycast(cam.CFrame.Position,ray*28,params)
-        if not (hit and (hit.Instance==pad or hit.Instance:IsDescendantOf(pad))) then
-            self.sellApproachIndex=((self.sellApproachIndex or 0)+1)%4
-            self.nextSellTry=os.clock()+.45
-            self:note('SELL: pad not in crosshair; changing approach')
+        if not pad then
+            self:note('SELL: DepositPad missing')
+            sale.retryAt=os.clock()+2
             return false
         end
-        -- Direct input: useItem('Deposit') previously switched to Axe, which
-        -- could invalidate the hand-carried state. This never switches tool.
-        local sent=self:tap()
-        if not sent then self:note('SELL: executor click failed'); return false end
-        self.sellApproachIndex=0
-        self.salePending={at=os.clock(),before=before,cash=readCash(self)}
-        self.stage='SELL: clicked; returning to farm'
-        -- No blocking server wait. Work loop checks payout in background.
-        return true
+        -- Revert to the V4.4 center-of-pad method, but only dwell one second.
+        -- On Instant TP clear air hold so the avatar physically stays on pad.
+        self.stage='SELL: teleport to DepositPad'
+        if self.clearWorkHover then self:clearWorkHover() end
+        if self.disableAirHold then self:disableAirHold() end
+        local point=pad.Position
+        if not self:goTo(point,1.2) then
+            sale.retryAt=os.clock()+.7
+            return false
+        end
+        sale.visits=sale.visits+1
+        local position=self:ground(point) or (point+Vector3.new(0,3.15,0))
+        local endAt=os.clock()+1.0
+        self.stage='SELL: standing on pad (1.0s)'
+        while self.running and self.live and not self:isPaused()
+            and pad.Parent and os.clock()<endAt do
+            local _,root,hum=self:character()
+            if not root then break end
+            if self.cfg.move=='Instant TP' then
+                -- Stay at platform center for the entire second, not edge.
+                if (root.Position-position).Magnitude>0.6 then
+                    root.CFrame=CFrame.new(position)*root.CFrame.Rotation
+                end
+                root.AssemblyLinearVelocity=Vector3.zero
+            elseif hum then
+                hum:MoveTo(position)
+            end
+            self:reconcileSale()
+            task.wait(.05)
+        end
+        self:reconcileSale()
+        if self.salePending then
+            sale.retryAt=os.clock()+.85
+            if sale.visits==1 or sale.visits%3==0 then
+                self:note('SELL awaiting server credit; will revisit pad ('
+                    ..sale.visits..' visits)')
+            end
+        end
+        return self.salePending==nil
     end
 end

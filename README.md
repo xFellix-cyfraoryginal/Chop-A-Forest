@@ -1,18 +1,17 @@
-# Chop-A-Forest V4.8.1 — Hands, Instant Sell, Boss Focus, Dodge, Speed
+# Chop-A-Forest V4.8.2 — DepositPad one-second server-sync fix
 
-PATCH ONLY over V4.8.0. Upload only listed files, keep others untouched.
+PATCH ONLY over V4.8.1: replace **main.lua**, **cogs/collection.lua**, **cogs/scheduler.lua**. Keep all other files/cogs unchanged.
 
-- `scheduler.lua`: with no Backpack, chop trees until at least HUD capacity logs are on the ground. Only then collect. If any logs are held, NEVER chop again until hands are emptied. For owned backpacks preserve ordinary collection. During active Guardian fight, prioritize Guardian over any other mob.
-- `collection.lua`: V7 confirmed a mouse click on `DepositPad` triggers sale. Navigate beside nearest pad, aim and verify crosshair raycast, LMB once, then leave. Cash/bag confirms asynchronously (no 9-second pad dwell, no spamming). With hands occupied, cannot chop until sale is confirmed.
-- `trees.lua`, `tools.lua`: duplicate hand-carry guard; quicker tree-to-tree transition and HP feedback.
-- `combat.lua`: when Jack enters Fighting state, interrupt minion attack and engage Guardian exclusively; longer boss combat sessions, faster HP confirmation.
-- `dodge.lua`: active MonsterFx red-zone dodging during HP sky shelter, updates sky-hold target instead of being snapped back.
-- `navigation.lua`: Instant TP updates without 0.1 second of route dwell.
-- `backpack.lua`: does not approach shop while carrying loose logs.
-- `main.lua`: cache-busting version 4.8.1.
+- Returned to the center of `DepositPad`, as in older versions; **stays there for one second** (both Instant TP and Walk).
+- Instant TP holds actual avatar in place on the pad; disables work hover/air velocity while selling.
+- No edge-only click that could make the HUD show 0/30 before the server clears inventory.
+- **HUD 0/30 is not enough** to reopen collection. Confirm by server-side money/`Stat_CashEarned` growth and empty HUD/hand count. A cash-change event watcher catches payment even when an auto-upgrade spends it immediately.
+- After one second the bot can go back to tree chopping. Pickup remains locked until sale is confirmed. If no credit arrives, it revisits the pad for another one-second attempt rather than spamming log pickup against server-side Bag Full.
+- Boss, Claws upgrades, Walk, egg, backpack, movement and combat behavior unchanged.
 
-**Important**: Sale crosshair raycast is used to prevent a missed LMB dumping carried logs. If DepositPad is occluded, bot retries from adjusted position rather than clicking blind. Does not invent server remote methods. Server may reject clicks or enforce rate limits.
+Loader:
+`loadstring(game:HttpGet("https://raw.githubusercontent.com/xFellix-cyfraoryginal/Chop-A-Forest/main/main.lua?v=4.8.2"))()`
 
-Run: `loadstring(game:HttpGet("https://raw.githubusercontent.com/xFellix-cyfraoryginal/Chop-A-Forest/main/main.lua?v=4.8.1"))()`
+**Caution:** If money changes are never replicated, bot deliberately refuses pickups while an unconfirmed sale is pending. Check debug `SELL awaiting server credit` to diagnose, rather than treating a local 0/30 as proof.
 
-Static Lua parse audit performed; **game runtime not tested**.
+Static Lua syntax checked; not run in live Roblox.
