@@ -35,8 +35,23 @@ return function(C)
                 if not self:goTo(part.Position,self.cfg.treeRange) then break end
                 if self.setWorkHover then self:setWorkHover(part) end
             end
+            -- Do not swing while still facing a previous tree. Check actual
+            -- camera/body alignment after each teleport or re-approach.
+            if self.ensureTreeAim and not self:ensureTreeAim(part) then
+                if self.clearWorkHover then self:clearWorkHover() end
+                if not self:goTo(part.Position,self.cfg.treeRange) then break end
+                if self.setWorkHover then self:setWorkHover(part) end
+                part=self:treePart(tree)
+                if not part then break end
+            end
             local previous=tree:GetAttribute('HP')
-            local ok,reason=self:useItem(part.Position+Vector3.new(0,1.1,0),'Tree')
+            local ok,reason=self:useItem(function()
+                -- Read fresh trunk position immediately before LPM, after
+                -- any cooldown or tool-slot change. Avoid stale TP targets.
+                if not self:treeValid(tree) then return nil end
+                local live=self:treePart(tree)
+                return live and live.Position+Vector3.new(0,1.05,0) or nil
+            end,'Tree')
             if not ok then
                 if self.isDodging and self:isDodging() then
                     if self.clearWorkHover then self:clearWorkHover() end

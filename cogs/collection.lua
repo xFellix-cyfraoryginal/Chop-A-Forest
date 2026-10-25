@@ -88,7 +88,7 @@ return function(C)
         self:note('Pickup failed; wood remains in queue')
         return false
     end
-    -- V4.8.2: Stand ON DepositPad for one full second, then return to work.
+    -- V4.8.3: Stand ON DepositPad for three full seconds, then return to work.
     -- HUD 0/30 alone is NOT a server-confirmed sale. Never pick up new logs
     -- until a credit + empty bag is observed (avoids server-side Bag Full).
     local function readCash(self)
@@ -185,7 +185,7 @@ return function(C)
             sale.retryAt=os.clock()+2
             return false
         end
-        -- Revert to the V4.4 center-of-pad method, but only dwell one second.
+        -- V4.8.3 center-of-pad dwell is three seconds for server bag sync.
         -- On Instant TP clear air hold so the avatar physically stays on pad.
         self.stage='SELL: teleport to DepositPad'
         if self.clearWorkHover then self:clearWorkHover() end
@@ -197,14 +197,14 @@ return function(C)
         end
         sale.visits=sale.visits+1
         local position=self:ground(point) or (point+Vector3.new(0,3.15,0))
-        local endAt=os.clock()+1.0
-        self.stage='SELL: standing on pad (1.0s)'
+        local endAt=os.clock()+3.0
+        self.stage='SELL: standing on pad (3.0s)'
         while self.running and self.live and not self:isPaused()
             and pad.Parent and os.clock()<endAt do
             local _,root,hum=self:character()
             if not root then break end
             if self.cfg.move=='Instant TP' then
-                -- Stay at platform center for the entire second, not edge.
+                -- Remain at pad center for full three seconds, not edge.
                 if (root.Position-position).Magnitude>0.6 then
                     root.CFrame=CFrame.new(position)*root.CFrame.Rotation
                 end

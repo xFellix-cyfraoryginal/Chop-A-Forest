@@ -1,17 +1,14 @@
-# Chop-A-Forest V4.8.2 — DepositPad one-second server-sync fix
+# Chop-A-Forest V4.8.3 — Close Pumpkin / SellPad 3s / Live Trunk Aim
 
-PATCH ONLY over V4.8.1: replace **main.lua**, **cogs/collection.lua**, **cogs/scheduler.lua**. Keep all other files/cogs unchanged.
+PATCH ONLY over V4.8.2. Replace exactly these FIVE files:
+`main.lua`, `cogs/collection.lua`, `cogs/hover.lua`, `cogs/trees.lua`, `cogs/pumpkin.lua`.
 
-- Returned to the center of `DepositPad`, as in older versions; **stays there for one second** (both Instant TP and Walk).
-- Instant TP holds actual avatar in place on the pad; disables work hover/air velocity while selling.
-- No edge-only click that could make the HUD show 0/30 before the server clears inventory.
-- **HUD 0/30 is not enough** to reopen collection. Confirm by server-side money/`Stat_CashEarned` growth and empty HUD/hand count. A cash-change event watcher catches payment even when an auto-upgrade spends it immediately.
-- After one second the bot can go back to tree chopping. Pickup remains locked until sale is confirmed. If no credit arrives, it revisits the pad for another one-second attempt rather than spamming log pickup against server-side Bag Full.
-- Boss, Claws upgrades, Walk, egg, backpack, movement and combat behavior unchanged.
+- PumpkinHead: center of real hitbox/model + ~1 stud side offset, almost the **same Y**, continuously repositions in Instant TP; adjusts angle on misses. Does NOT hover above head. Walk mode approaches normally.
+- Tree: both character facing and camera look at live trunk. The facing check is evaluated before a swing, and the final attack position is read AFTER weapon cooldown. No more stale aim during tree hops.
+- SellPad: 3 continuous seconds physically on the DepositPad instead of 1 second. Keep V4.8.2 cash+bag confirmation gate.
+- No change to Boss air orbit (Guardian), free Egg PickPrompt pickup, Auto Backpack, Claws Speed, Walk mode, or F6/F8.
 
-Loader:
-`loadstring(game:HttpGet("https://raw.githubusercontent.com/xFellix-cyfraoryginal/Chop-A-Forest/main/main.lua?v=4.8.2"))()`
+Launcher:
+`loadstring(game:HttpGet("https://raw.githubusercontent.com/xFellix-cyfraoryginal/Chop-A-Forest/main/main.lua?v=4.8.3"))()`
 
-**Caution:** If money changes are never replicated, bot deliberately refuses pickups while an unconfirmed sale is pending. Check debug `SELL awaiting server credit` to diagnose, rather than treating a local 0/30 as proof.
-
-Static Lua syntax checked; not run in live Roblox.
+This patch is statically syntax-checked only; not executed in live Roblox. Export pistol observations using separate `CropForest_Pistol_Weapon_Logger_V13_RAW.lua`, not part of GitHub repo.
