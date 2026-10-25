@@ -93,7 +93,9 @@ return function(C)
             self.stage='WAIT: backpack HUD'; task.wait(.3); return
         end
         if self.cfg.sell and cap and bag>=cap then
-            if not self:sellBag() then task.wait(.25) end
+            if self:sellBag() then
+                self:tryBuyClawsSpeed('sell settled')
+            else task.wait(.25) end
             return
         end
         local wood,ready=self:woodCounts()
@@ -114,13 +116,15 @@ return function(C)
             end
             -- If backlog is full or trees are absent, cash out carried wood.
             if self.cfg.sell and bag>0 then
-                self:sellBag(); return
+                if self:sellBag() then self:tryBuyClawsSpeed('sell settled') end
+                return
             end
             self.stage='WOOD: waiting/retry ('..wood..', ready '..ready..')'
             task.wait(.13); return
         end
         if self.cfg.sell and bag>0 then
-            self:sellBag(); return
+            if self:sellBag() then self:tryBuyClawsSpeed('sell settled') end
+            return
         end
         local tree=self:chooseTree()
         if tree then self:chopTree(tree); return end
@@ -157,9 +161,10 @@ return function(C)
         self.eventSeen,self.eventPending={},{}
         local session=self.session
         self.stage='STARTING'
-        self:note('V4.7.8 FARM/MOBS: farm='..tostring(self.cfg.farm)
+        self:note('V4.7.9 FARM/MOBS: farm='..tostring(self.cfg.farm)
             ..', kill='..tostring(self.cfg.combat))
         task.spawn(function() self:watchSafety(session) end)
+        task.spawn(function() self:tryBuyClawsSpeed('start balance') end)
         task.spawn(function() self:workLoop(session) end)
     end
 end

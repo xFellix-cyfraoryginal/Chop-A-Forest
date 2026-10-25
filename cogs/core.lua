@@ -17,7 +17,7 @@ return function(C)
     C.cfg = {
         move = 'Instant TP', priority = 'EVENT', tool = 'Auto',
         farm = true, combat = true, collect = true, sell = true,
-        autoBackpack = true,
+        autoBackpack = true, autoClawsSpeed = true,
         hpPause = true, pauseHP = 0.40, pauseSeconds = 6,
         retaliateSeconds = 9, clearUntil = 1, combatRadius = 65,
         pickupRange = 3.7, treeRange = 3.7,

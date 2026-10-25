@@ -1,4 +1,4 @@
--- V4.7.8: compact farm/combat panel + Walk/Instant TP movement.
+-- V4.7.9: compact farm/combat panel + Walk/Instant TP movement.
 return function(C)
     local function make(class,props,parent)
         local obj=Instance.new(class)
@@ -21,10 +21,10 @@ return function(C)
         local ok,hui=pcall(gethui)
         if ok and hui then parent=hui end
     end
-    local gui=make('ScreenGui',{Name='CAF_FarmMobs_V4_7_8',ResetOnSpawn=false,
+    local gui=make('ScreenGui',{Name='CAF_FarmMobs_V4_7_9',ResetOnSpawn=false,
         IgnoreGuiInset=true,ZIndexBehavior=Enum.ZIndexBehavior.Sibling},parent)
     C.gui=gui
-    local panel=round(make('Frame',{Size=UDim2.fromOffset(344,322),
+    local panel=round(make('Frame',{Size=UDim2.fromOffset(344,372),
         Position=UDim2.fromOffset(24,112),BackgroundColor3=dark,BorderSizePixel=0},gui),11)
     make('UIStroke',{Color=Color3.fromRGB(68,83,106),Thickness=1},panel)
     local head=round(make('Frame',{Size=UDim2.new(1,0,0,44),
@@ -47,7 +47,7 @@ return function(C)
         Size=UDim2.new(1,0,1,-44),BackgroundTransparency=1},panel)
     action(head,'_',7,29,dark,function()
         collapsed=not collapsed
-        panel.Size=UDim2.fromOffset(344,collapsed and 44 or 322)
+        panel.Size=UDim2.fromOffset(344,collapsed and 44 or 372)
         body.Visible=not collapsed
     end,272,28)
     local taskLabel=make('TextLabel',{Position=UDim2.fromOffset(12,7),
@@ -80,7 +80,19 @@ return function(C)
         C.motion=C.motion+1
         C:note('Movement changed to '..C.cfg.move)
     end)
-    make('TextLabel',{Position=UDim2.fromOffset(12,253),Size=UDim2.new(1,-24,0,22),
+    local speed=action(body,'CLAW SPEED AUTO BUY: ON',257,38,surface,function()
+        C.cfg.autoClawsSpeed=not C.cfg.autoClawsSpeed
+        C:note('Claws Speed Auto Buy '..(C.cfg.autoClawsSpeed and 'ON' or 'OFF'))
+        if C.cfg.autoClawsSpeed then
+            task.spawn(function() C:tryBuyClawsSpeed('enabled in panel') end)
+        end
+    end)
+    local speedInfo=make('TextLabel',{Position=UDim2.fromOffset(12,298),
+        Size=UDim2.new(1,-24,0,19),BackgroundTransparency=1,
+        Text='Claws Speed: checking price',TextColor3=muted,
+        TextSize=11,Font=Enum.Font.Gotham,
+        TextXAlignment=Enum.TextXAlignment.Left},body)
+    make('TextLabel',{Position=UDim2.fromOffset(12,321),Size=UDim2.new(1,-24,0,22),
         BackgroundTransparency=1,Text='F6 START/STOP   |   F8 STOP',
         TextSize=11,TextColor3=muted,Font=Enum.Font.Gotham,
         TextXAlignment=Enum.TextXAlignment.Left},body)
@@ -117,6 +129,12 @@ return function(C)
             farm.BackgroundColor3=C.cfg.farm and green or surface
             combat.Text='KILL MOBS: '..(C.cfg.combat and 'ON' or 'OFF')
             combat.BackgroundColor3=C.cfg.combat and green or surface
+            speed.Text='CLAW SPEED AUTO BUY: '..(C.cfg.autoClawsSpeed and 'ON' or 'OFF')
+            speed.BackgroundColor3=C.cfg.autoClawsSpeed and green or surface
+            local cost,state,level=C:clawsSpeedOffer()
+            speedInfo.Text='Claw Speed Lv'..tostring(level or 0)..': '
+                ..(state=='MAX' and 'MAXED' or cost and ('next '..tostring(cost)..' coins')
+                    or tostring(state or 'unknown'))
             move.Text='MOVEMENT: '..C.cfg.move
             move.BackgroundColor3=C.cfg.move=='Walk' and green or surface
             task.wait(.28)
