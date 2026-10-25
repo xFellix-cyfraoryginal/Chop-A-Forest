@@ -104,6 +104,36 @@ return function(C)
         end
         return best
     end
+    -- Biter/Pumpkinling enemies use the same MonsterId/HP registry as
+    -- Gravediggers. Never match decorative pumpkins or the Guardian boss.
+    function C:isPumpkinEnemy(enemy)
+        if not self:enemyValid(enemy) then return false end
+        if enemy:GetAttribute('Monster')=='Guardian' then return false end
+        local name=(enemy.Name..' '..tostring(enemy:GetAttribute('DisplayName') or '')):lower()
+        return name:find('biter',1,true)~=nil
+            or name:find('pumpkinling',1,true)~=nil
+            or name:find('pumpkin',1,true)~=nil
+    end
+    function C:pumpkinCount()
+        local count=0
+        for mob in pairs(self.enemies) do
+            if self:isPumpkinEnemy(mob) then count=count+1 end
+        end
+        return count
+    end
+    function C:pickPumpkin()
+        local from=self:position()
+        if not from then return nil end
+        local best,dist=nil,math.huge
+        for mob in pairs(self.enemies) do
+            if self:isPumpkinEnemy(mob) and os.clock()>=(self.enemyRetry[mob] or 0) then
+                local at=self:enemyPosition(mob)
+                local d=at and (at-from).Magnitude or math.huge
+                if d<dist then best,dist=mob,d end
+            end
+        end
+        return best
+    end
     function C:pickBoss()
         local best,dist=nil,math.huge
         local from=self:position()

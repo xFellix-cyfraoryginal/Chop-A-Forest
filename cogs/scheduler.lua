@@ -21,19 +21,24 @@ return function(C)
             self.stage='WAIT: backpack HUD'; task.wait(.45); return
         end
         if not setup and self.cfg.priority=='ATTACK' and self.cfg.combat then
-            -- ALWAYS chase a live Gravedigger/Skeleton, including the last
-            -- one. When none are present, farm trees to progress the event.
-            -- Do not divert to Biters/Pumpkinlings or the Guardian boss.
+            -- Strict order across the entire loaded map: skeletons first,
+            -- pumpkin mobs second, then resume collecting/chopping.
+            -- A retry cooldown on one target never blocks the other class.
             local skeleton=self:pickSkeleton()
             if skeleton then
-                self.stage='EVENT: hunting skeleton'
+                self.stage='EVENT: skeletons first'
                 self:fight(skeleton)
                 return
             end
-            self.stage='EVENT: no skeletons; clearing trees'
+            local pumpkin=self:pickPumpkin()
+            if pumpkin then
+                self.stage='EVENT: clearing pumpkin mobs'
+                self:fight(pumpkin)
+                return
+            end
+            self.stage='EVENT: mobs cleared; farming trees'
         end
-        -- FARM FIRST still defends itself if hurt. ATTACK FIRST strictly
-        -- skips pumpkin enemies, even when they are close to the character.
+        -- FARM FIRST continues to defend itself only when hurt.
         if self.cfg.priority~='ATTACK' and self:urgentCombat() then
             local enemy=self:pickEnemy(18)
             if enemy then self:fight(enemy); return end
@@ -116,7 +121,7 @@ return function(C)
         self.safeTree=nil; self.safeTreeUntil=0
         local session=self.session
         self.stage='STARTING'
-        self:note('V4.7.1 AUTO BUY NO UPGRADES '..self.cfg.priority..' / '..self.cfg.move)
+        self:note('V4.7.2 SKELETON THEN PUMPKIN '..self.cfg.priority..' / '..self.cfg.move)
         task.spawn(function() self:watchSafety(session) end)
         task.spawn(function() self:workLoop(session) end)
     end

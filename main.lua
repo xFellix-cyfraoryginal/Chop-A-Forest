@@ -1,7 +1,7 @@
--- Chop-A-Forest | STARTER+AXE FIX+ENDLESS V4.7.1 | github.com/xFellix-cyfraoryginal/Chop-A-Forest
+-- Chop-A-Forest | SKELETON+PUMPKIN V4.7.2 | github.com/xFellix-cyfraoryginal/Chop-A-Forest
 -- All Lua/Luau, no build step. Upload main.lua and cogs/ together.
 local BASE = 'https://raw.githubusercontent.com/xFellix-cyfraoryginal/Chop-A-Forest/main/'
-local VERSION = '4.7.1'
+local VERSION = '4.7.2'
 local FILES = {
     'core', 'world', 'navigation', 'tools', 'survival',
     'trees', 'collection', 'combat', 'dodge',
@@ -37,4 +37,4 @@ if not ok then
     error('[CAF V4] Start failed: ' .. tostring(err))
 end
 env.CAF_V4, env.CAF_ALPHA = C, C
-print('[CAF V4] AXE BUY FIX / NO UPGRADES ' .. VERSION .. ' ready (F8 = STOP)')
+print('[CAF V4] SKELETON FIRST + PUMPKIN SECOND ' .. VERSION .. ' ready (F8 = STOP)')
