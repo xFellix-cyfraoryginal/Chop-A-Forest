@@ -99,11 +99,16 @@ return function(C)
                 end
             end
         end
-        if not self.config.autoCombat and closest < self.config.dangerRadius - 4 then
-            return "Mob za blisko, Auto Combat wylaczony"
+        -- Being NEAR two mobs is not yet an emergency. Give the Walk-mode
+        -- sidestep logic time to circle them instead of perma-retreating.
+        if not self.config.autoCombat and closest < self.config.meleeDangerRadius
+            and hp < maxHP * .85 then
+            return "Mob uderza podczas farmienia"
         end
-        if count >= self.config.maxThreats then
-            return "Otoczenie: " .. count .. " mobow w poblizu"
+        if count >= self.config.maxThreats
+            and closest < self.config.meleeDangerRadius
+            and (hp < maxHP * .86 or count >= 4) then
+            return "Otoczenie blisko: " .. count .. " mobow"
         end
         if os.clock() - self.lastDamageAt < 2.5 and closest < self.config.dangerRadius
             and hp < maxHP - 0.2 then

@@ -1,34 +1,32 @@
-# Chop-A-Forest | Auto Farm Survival V3.1 Lite
+# Chop-A-Forest — Smart Farm V3.2
 
-Single-language **Luau** source, GitHub RAW loader and `cogs/` modules. **No Python and no loggers** in this repository.
+Repo: `xFellix-cyfraoryginal/Chop-A-Forest`. Pure Lua/Luau. `main.lua` fetches the cogs via raw GitHub, in order.
 
-### Changes from V3
-- Defaults: **Performance: Eco**, tree/log/mob highlights disabled (you can enable them in CONFIG and COMBAT).
-- Tree selection uses 96-stud spatial cells instead of scanning all trees every iteration.
-- Area identification cached briefly while player stays near the same position.
-- Successful/failed walking path objects are released with `:Destroy()`; short journeys skip pathfinding.
-- UI and optional visuals update less frequently on Eco. Safety watchdog **still checks rapidly** when the farm is running.
-- STOP/START race fixed using a session token; stale loops cannot turn off a newly started farm.
-- Broken trees get a temporary retry cooldown, preventing wasteful retry loops.
-- UNLOAD clears cached world data, visual objects and event connections.
+## Deploy
+Upload `main.lua`, every file in `cogs/` and `README.md` **preserving relative paths**. Commit them to branch `main`. Then start the existing loadstring:
 
-### Installation
-Upload `main.lua` and `cogs/` (preserve directory names) to your existing repository:
-`https://github.com/xFellix-cyfraoryginal/Chop-A-Forest`
-
-Then run through your executor:
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/xFellix-cyfraoryginal/Chop-A-Forest/main/main.lua"))()
 ```
 
-### Important memory warning
-A Task Manager snapshot showing about **10 GB Roblox RAM before injecting V3** cannot be explained by V3.1. Shut down every Roblox client process, restart and measure idle memory **before** testing. Roblox asset memory / engine caching is not released by running garbage collection in a Luau script. We do not claim a reduction of the game's native memory use.
+All cogs have fewer than 300 lines. There is no Python or separate logger in the repository.
 
-### Testing
-1. Relaunch Roblox, note idle RAM, CPU and GPU in Task Manager.
-2. Run Auto Farm in Eco mode; keep all highlights OFF for baseline.
-3. Test 1 tree, automatic log pickup and Sell; watch real backpack changes.
-4. Enable Defend only after collecting works. Bosses stay OFF. Safety stays ON.
-5. Compare baseline and RAM after 5-10 minutes. For rising memory, export DEBUG JSON and report measured usage at both times.
+## Changes in V3.2
 
-All cog source files are under 300 lines; no bundler is needed. `main.lua` pulls cog files from your repository. Runtime behavior requires in-game validation.
+- `attack.lua`: Shared item cooldown limiter across attacks and pickup. Adjustable `itemCooldown` (default 0.62 s). If an equipped Roblox Tool exposes `AttackCooldown`, `SwingCooldown`, `Cooldown` or `AttackDelay`, honor it if longer (not a guarantee of game-specific slot cooldown). Cooldown gets refreshed on successful input; server's own cooldown always applies.
+- `settle.lua`: After tree is confirmed felled, wait until nearby logs exist, no new logs arrive, and their positions remain stable during falling animation. Max wait 6.5 s by default.
+- `world.lua`: Newly spawned logs cannot be picked immediately (min age 2.4 s). Attempts still require HUD bag increase to count as pickups. Per-tree collection prefers newly created logs, not existing drops from older trees.
+- `safety.lua` / `tactics.lua`: Crowd within 17 studs alone is not an emergency; steer around mobs during Walk. Retreat if critical HP, recent damage, boss or actual close crowd. Walk is default, and escape mode defaults to 'Match farm'.
+- `combat.lua`: Orbit target between attacks instead of only backing away, still requires real HP reduction for confirmed hits.
+- `movement.lua`: `face` may rotate body without forcing the camera if Free Look is on.
+- `camera.lua`: Optional independent camera, all rendering remains enabled, with character position marker. **Camera-dependent clicks can fail in spectator mode.** This is not verified silent aim.
+- No Eco switch; moderate UI/ESP cadence remains automatic.
+
+## Test order
+1. Fresh Roblox session. Test Walk, free look OFF, spectator OFF. Tree -> falling animation -> logs -> Sell.
+2. Enable Free Look. Check whether tree hits/pickup still increase server HP/bag. If not, switch it OFF.
+3. Enable Spectator only after working with Free Look. The scene remains fully rendered; use RMB to rotate, arrows to move camera, PageUp/Down to raise/lower camera. Because game input may rely on camera aim, **this mode may break attacks/collection**. Turn it OFF if so.
+4. Enable Defend combat, Kite ON. Observe retreat behavior and HP. This is a prototype and not guaranteed to prevent deaths.
+5. Export DEBUG JSON for misses/timeouts. No logger required.
+
+No attempt to bypass game server hit validation. Do not assume client-side visuals equal server-confirmed successful actions.

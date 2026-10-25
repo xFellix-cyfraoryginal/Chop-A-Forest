@@ -8,27 +8,32 @@ return function(C)
     C.pathService = game:GetService("PathfindingService")
     C.config = {
         mode = "Walk", stepSpeed = 38, attackDelay = 0.68,
+        itemCooldown = 0.62, autoToolCooldown = true,
         attackMode = "Input", toolSlot = "2", hitDistance = 3.8,
         sellAfterTree = true, sellWhenFull = true,
         autoCollect = true, autoSell = true, goldFirst = false,
         showTree = false, showLogs = false, selectedArea = "Current",
         maxFailures = 3, maxTreeDistance = 220,
         pickupDistance = 4.6, pickupDelay = 0.32, pickupRetries = 3,
+        logMinAge = 2.4, logSettleTime = 0.85, logSettleTimeout = 6.5,
         autoCombat = false, combatMode = "Defend", combatPriority = "Threats",
         combatSearch = 75, combatReach = 5, combatDelay = 0.57,
         combatTool = "2", combatHealth = 65, showMobs = false,
         allowBoss = false, safetyOn = true, avoidMobs = true,
         panicPercent = 65, resumePercent = 90, maxThreats = 2,
         dangerRadius = 17, avoidDistance = 9, safeDistance = 26,
-        escapeMode = "Instant TP", healTimeout = 30,
-        eventOnly = false, eventMobs = false, perfMode = "Eco"
+        escapeMode = "Match farm", healTimeout = 30,
+        kiteEnabled = true, orbitDistance = 4.6, kiteStep = 4.5,
+        kiteRadius = 12, meleeDangerRadius = 5.5,
+        freeLook = false, spectator = false, spectatorSpeed = 36,
+        eventOnly = false, eventMobs = false
     }
     C.alive = true
     C.running = false
     C.workerAlive = false
     C.motionToken = 0
     C.logs = {}
-    C.logLimit = 140
+    C.logLimit = 120
     C.sessionId = 0
     C.stats = {felled = 0, pickups = 0, sold = 0, hits = 0, failures = 0,
         mobHits = 0, mobKills = 0, combatFailures = 0, retreats = 0, damageTaken = 0}
@@ -41,6 +46,9 @@ return function(C)
     C.failedTrees = {}
     C.remoteSeq = 0
     C.lastIssue = ""
+    C.selectedSlot = "2"
+    C.toolNextAt = {}
+    C.toolObservedCooldown = {}
     C.map = C.ws:FindFirstChild("Map")
     C.treeFolder = C.map and C.map:FindFirstChild("Trees")
     C.logFolder = C.ws:FindFirstChild("Logs")
@@ -127,7 +135,7 @@ return function(C)
         end)
     end
     function C:export()
-        local data = {version = "Survival V3.1 - Lite", stats = self.stats, config = self.config,
+        local data = {version = "Smart Farm V3.2", stats = self.stats, config = self.config,
             state = self.stage, problem = self.lastIssue, logs = self.logs,
             placeId = game.PlaceId, cash = self:cash()}
         local ok, payload = pcall(self.http.JSONEncode, self.http, data)
@@ -151,7 +159,8 @@ return function(C)
         -- Release our own strong references to world Instances and callback objects.
         for _, name in ipairs({"trees", "treeIndex", "treeCells", "treePositions",
             "drops", "enemies", "badEnemies", "vis", "failedTrees", "blockedTrees",
-            "connections", "cleanup", "logs"}) do
+            "connections", "cleanup", "logs", "logSpawnAt",
+            "toolNextAt", "toolObservedCooldown"}) do
             if type(self[name]) == "table" then table.clear(self[name]) end
         end
         local env = type(getgenv) == "function" and getgenv() or _G

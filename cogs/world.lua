@@ -3,6 +3,7 @@ return function(C)
     C.trees, C.drops = {}, {}
     C.treeCells, C.treeIndex = {}, {}
     C.blockedTrees = {}
+    C.logSpawnAt = {}
     local CELL = 96
     local function cell(x,z) return math.floor(x/CELL)..":"..math.floor(z/CELL) end
     local function treeOk(m)
@@ -121,19 +122,23 @@ return function(C)
     local function addLog(obj)
         if obj.Name=="Log" and (obj:IsA("Model") or obj:IsA("BasePart")) then
             C.drops[obj]=true
+            C.logSpawnAt[obj] = os.clock()
         end
     end
     if C.logFolder then
         for _,obj in ipairs(C.logFolder:GetChildren()) do addLog(obj) end
         C:connect(C.logFolder.ChildAdded,addLog)
-        C:connect(C.logFolder.ChildRemoved,function(obj) C.drops[obj]=nil end)
+        C:connect(C.logFolder.ChildRemoved,function(obj)
+            C.drops[obj]=nil; C.logSpawnAt[obj]=nil
+        end)
     end
-    function C:nearestLog(maxD,rejected)
+    function C:nearestLog(maxD,rejected,allowed)
         local pos=self:pos()
         if not pos then return nil end
         local best,distance=nil,nil
         for log in pairs(self.drops) do
-            if not (rejected and rejected[log]) then
+            if not (rejected and rejected[log]) and (not allowed or allowed[log])
+                and os.clock() - (self.logSpawnAt[log] or 0) >= self.config.logMinAge then
                 local pt=self:logPart(log)
                 if pt then
                     local d=(pt.Position-pos).Magnitude

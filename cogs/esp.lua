@@ -36,7 +36,7 @@ return function(C)
     C:connect(game:GetService("RunService").Heartbeat, function(dt)
         if not C.alive then return end
         elapsed = elapsed + dt
-        if elapsed < (C.config.perfMode == "Eco" and 1.1 or 0.4) then return end
+        if elapsed < .65 then return end
         elapsed = 0
         local target = C.target
         local trunk = target and C:trunk(target)

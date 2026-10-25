@@ -39,10 +39,46 @@ return function(C)
         end
         return false
     end
-    C.click = function(self) return clickMouse() end
+    -- Shared item limiter: input-based chopping, combat and pickup all use clicks.
+    -- An equipped Tool's replicated cooldown takes priority over the fallback.
+    function C:currentToolKey()
+        local ch = self.player.Character
+        local item = ch and ch:FindFirstChildOfClass("Tool")
+        if item then return "Tool:" .. item.Name, item end
+        return "Slot:" .. tostring(self.selectedSlot or "unknown"), nil
+    end
+    function C:toolDelay(item)
+        local delay = tonumber(self.config.itemCooldown) or .62
+        if self.config.autoToolCooldown and item then
+            for _, attr in ipairs({"AttackCooldown","SwingCooldown","Cooldown","AttackDelay"}) do
+                local val = item:GetAttribute(attr)
+                if type(val) == "number" and val > .08 and val < 5 then
+                    delay = math.max(delay, val)
+                    break
+                end
+            end
+        end
+        return math.clamp(delay, .2, 4)
+    end
+    function C:click()
+        local key, item = self:currentToolKey()
+        local nextAt = math.max(self.toolNextAt[key] or 0, self.lastGlobalClick or 0)
+        while self.running and not self.safetyAlert and os.clock() < nextAt do
+            task.wait(math.min(.06, nextAt - os.clock()))
+        end
+        if not self.running or self.safetyAlert then return false end
+        local fired = clickMouse()
+        if fired then
+            local delay = self:toolDelay(item)
+            self.toolNextAt[key] = os.clock() + delay
+            self.lastGlobalClick = os.clock() + math.min(delay, .25)
+        end
+        return fired
+    end
     function C:chooseTool(slot)
         slot = slot or self.config.toolSlot
         if slot == "Auto" then return end
+        if tostring(slot) == tostring(self.selectedSlot) and self.toolSlotInitialized then return end
         local n = tonumber(slot)
         if not n then return end
         if type(keypress) == "function" and type(keyrelease) == "function" then
@@ -61,8 +97,16 @@ return function(C)
                 end)
             end
         end
+        self.selectedSlot = tostring(slot)
+        self.toolSlotInitialized = true
         task.wait(0.11)
     end
+    C:connect(C.uid.InputBegan, function(input, processed)
+        if processed then return end
+        local name = input.KeyCode and input.KeyCode.Name
+        if name == "One" then C.selectedSlot = "1"; C.toolSlotInitialized = false
+        elseif name == "Two" then C.selectedSlot = "2"; C.toolSlotInitialized = false end
+    end)
     function C:attackTree(tree)
         local p = self:trunk(tree)
         if not p then return false end
@@ -88,7 +132,7 @@ return function(C)
                 end)
             end
         else
-            fired = clickMouse()
+            fired = self:click()
         end
         if not fired then
             self:note("error", "Brak metody ataku (mouse1click / VIM) lub RemoteEvents")

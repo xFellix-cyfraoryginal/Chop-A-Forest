@@ -1,6 +1,6 @@
 -- CropForest: pickup and sell verified through backpack HUD, no fake success on proximity
 return function(C)
-    function C:collectLogs()
+    function C:collectLogs(allowed)
         if not self.config.autoCollect then return end
         self.stage = "Collect"
         local rejected, attempts, gathered = {}, 0, 0
@@ -17,7 +17,7 @@ return function(C)
                 return gathered
             end
             if capacity and before >= capacity then return gathered end
-            local log, distance = self:nearestLog(90, rejected)
+            local log, distance = self:nearestLog(90, rejected, allowed)
             if not log then break end
             local part = self:logPart(log)
             if not part then

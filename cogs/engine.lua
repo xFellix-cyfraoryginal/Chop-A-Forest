@@ -3,6 +3,8 @@ return function(C)
     function C:doTree(tree)
         self.stage = "Move to tree"
         self.target = tree
+        self.preFellLogs = {}
+        for log in pairs(self.drops) do self.preFellLogs[log] = true end
         if not self:moveToTree(tree) then
             self:note("warn", "Nie moge dojsc do drzewa")
             self.target = nil
@@ -51,6 +53,8 @@ return function(C)
                 self.stage = "Waiting HUD"
                 self:note("warn", "Czekam na ChopHud.Backpack.Count")
                 task.wait(1)
+            elseif self.config.kiteEnabled and self:tryAvoidCrowd() then
+                -- Short sidestep in Walk mode; only actual injury/critical threats panic.
             elseif self.config.autoSell and cap and bag >= cap and self.config.sellWhenFull then
                 self:sellLogs()
             elseif self.config.autoCombat and self.config.combatPriority == "Combat"
@@ -88,8 +92,9 @@ return function(C)
                         if success then
                             self.failedTrees[tree] = nil
                             if self.config.autoCollect and not self.safetyAlert then
-                                task.wait(.17)
-                                if not self.safetyAlert then self:collectLogs() end
+                                local ready = self:waitForWood(tree)
+                                if not self.safetyAlert then self:collectLogs(ready) end
+                                self.preFellLogs = nil
                             end
                             if self.config.autoSell and not self.safetyAlert then
                                 local count, capacity = self:backpack()
@@ -111,7 +116,7 @@ return function(C)
                     end
                 end
             end
-            task.wait(self.config.perfMode == "Eco" and .32 or .17)
+            task.wait(.2)
         end
         self.target = nil
         self.targetEnemy = nil

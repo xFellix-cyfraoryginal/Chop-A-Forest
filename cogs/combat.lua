@@ -104,11 +104,14 @@ return function(C)
                 if not self:move(position, self.config.combatReach - 0.6) then break end
             end
             if self.safetyAlert or not self:enemyOK(mob) then break end
-            -- One opponent: step back if it closes in, rather than face-tanking.
-            local diff = root.Position - position
-            local lateral = Vector3.new(diff.X, 0, diff.Z)
-            if lateral.Magnitude > .15 and distance < math.max(3.2, self.config.combatReach - 1.6) then
-                self:move(root.Position + lateral.Unit * 4.5, 2.0)
+            -- Keep moving sideways (Walk), with a safe score for either orbit side.
+            -- We do not teleport in the normal combat loop.
+            if self.config.kiteEnabled and self.config.mode == "Walk"
+                and (hits == 0 or hits % 2 == 0)
+                and distance < self.config.combatReach + 1 then
+                local orbit = self:circlePoint(mob, math.max(3.8,
+                    self.config.combatReach - 1))
+                if orbit then self:move(orbit,2.2) end
                 if self.safetyAlert then break end
             end
             if self:nearbyThreats(root.Position, self.config.dangerRadius)
@@ -176,7 +179,7 @@ return function(C)
     local acc = 0
     C:connect(game:GetService("RunService").Heartbeat, function(dt)
         acc = acc + dt
-        if acc < (C.config.perfMode == "Eco" and 1 or .25) then return end
+        if acc < .45 then return end
         acc = 0
         local enemy = C.targetEnemy
         hi.Enabled = C.alive and C.config.showMobs and C.running and C:enemyOK(enemy)
