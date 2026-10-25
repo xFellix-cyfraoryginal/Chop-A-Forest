@@ -1,19 +1,68 @@
--- MonsterId-based targeting. No crowd-size bailouts or automatic kite dance.
+-- V4.2 whole-map combat. A moving enemy is followed every Heartbeat.
+-- Uses no RemoteEvent guessing and never attacks stale coordinates.
 return function(C)
+    local rs=game:GetService('RunService')
     C.enemyRetry={}
+    C.followTarget=nil
+    C.followHeight=3.8
+    C.savedAutoRotate=nil
+    function C:stopHover()
+        self.followTarget=nil
+        local _,_,hum=self:character()
+        if hum and self.savedAutoRotate~=nil then
+            hum.AutoRotate=self.savedAutoRotate
+        end
+        self.savedAutoRotate=nil
+    end
+    function C:startHover(enemy)
+        if not self:enemyValid(enemy) then return false end
+        local _,_,hum=self:character()
+        if not hum then return false end
+        if self.savedAutoRotate==nil then self.savedAutoRotate=hum.AutoRotate end
+        hum.AutoRotate=false
+        self.followTarget=enemy
+        return true
+    end
+    C:connect(rs.Heartbeat,function()
+        local enemy=C.followTarget
+        if not enemy then return end
+        if not C.live or not C.running or C:isPaused() or not C:enemyValid(enemy) then
+            C:stopHover(); return
+        end
+        local _,root,hum=C:character()
+        local at=C:enemyPosition(enemy)
+        if not root or not at then C:stopHover(); return end
+        -- Slight horizontal offset avoids standing inside the target's hitbox.
+        -- Constant Y + zero velocity prevent gravity from dropping the client
+        -- character between target updates while the fight is active.
+        local goal=at+Vector3.new(.6,C.followHeight,.6)
+        local flat=Vector3.new(at.X,goal.Y,at.Z)
+        root.CFrame=CFrame.lookAt(goal,flat)
+        root.AssemblyLinearVelocity=Vector3.zero
+        root.AssemblyAngularVelocity=Vector3.zero
+    end)
+    -- Keep the camera crosshair on the MOVING target every rendered frame.
+    -- Tool useItem also resolves the point again immediately before a click.
+    C:connect(rs.RenderStepped,function()
+        local enemy=C.followTarget
+        if not enemy or not C.running then return end
+        local at=C:enemyPosition(enemy)
+        if at then C:aimAt(at+Vector3.new(0,.55,0)) end
+    end)
     function C:pickEnemy(radius)
         if not self.cfg.combat then return nil end
-        local point=self:position()
-        if not point then return nil end
-        local chosen,best=nil,math.huge
-        radius=radius or self.cfg.combatRadius
+        local from=self:position()
+        if not from then return nil end
+        local chosen,dist=nil,math.huge
+        -- ATTACK has unlimited search by default. FARM retaliation is local.
+        radius=radius or math.huge
         for mob in pairs(self.enemies) do
-            if self:enemyValid(mob) and mob:GetAttribute('Monster')~='Guardian'
+            if self:enemyValid(mob)
                 and os.clock()>=(self.enemyRetry[mob] or 0) then
                 local at=self:enemyPosition(mob)
                 if at then
-                    local d=(at-point).Magnitude
-                    if d<radius and d<best then chosen,best=mob,d end
+                    local d=(at-from).Magnitude
+                    if d<=radius and d<dist then chosen,dist=mob,d end
                 end
             end
         end
@@ -21,48 +70,61 @@ return function(C)
     end
     function C:fight(enemy)
         if not self:enemyValid(enemy) or self:isPaused() then return false end
-        self.stage='COMBAT: target'
+        self.stage='COMBAT: tracking live target'
+        self:cancelMove()
+        if not self:startHover(enemy) then return false end
         local misses,shots=0,0
-        local deadline=os.clock()+20
+        local lastHP=enemy:GetAttribute('HP')
+        local deadline=os.clock()+24
         while self.running and not self:isPaused() and self:enemyValid(enemy)
-            and shots<35 and os.clock()<deadline do
-            -- FARM only defends against nearby enemies for a brief time after damage.
+            and shots<40 and os.clock()<deadline do
             if self.cfg.priority=='FARM' and not self:urgentCombat() then break end
             local at=self:enemyPosition(enemy)
-            local p=self:position()
-            if not at or not p then break end
-            local profile=self:activeProfile()
-            local reach=profile=='Pistol' and 13 or 4.1
-            if (at-p).Magnitude>reach then
-                self.stage='COMBAT: approaching'
-                if not self:goTo(at,reach-0.6) then break end
-            end
-            self.stage='COMBAT: attacking'
+            if not at then break end
+            self.stage='COMBAT: hovering + attacking'
+            -- Read live enemy position AFTER tool cooldown and immediately
+            -- BEFORE input. Heartbeat independently follows its movement.
             local before=enemy:GetAttribute('HP')
-            local ok,why=self:useItem(at+Vector3.new(0,1.2,0),'Combat')
+            local ok,why=self:useItem(function()
+                local p=self:enemyPosition(enemy)
+                return p and p+Vector3.new(0,.55,0)
+            end,'Combat')
             if not ok then self:note(why or 'Combat input failed'); break end
             shots=shots+1
             local confirmed=false
-            local untilAt=os.clock()+.9
+            local untilAt=os.clock()+.65
             while self.running and not self:isPaused() and os.clock()<untilAt do
                 local after=enemy:GetAttribute('HP')
-                if not self:enemyValid(enemy) or
-                    (type(before)=='number' and type(after)=='number' and after<before-.01) then
-                    confirmed=true; break
+                if type(before)=='number' and type(after)=='number' and after<before-.01 then
+                    confirmed=true; lastHP=after; break
                 end
-                task.wait(.06)
+                if not self:enemyValid(enemy) then break end
+                task.wait(.045)
             end
-            misses=confirmed and 0 or misses+1
-            if misses>=3 then
-                self:note('Combat no damage: temporary target cooldown'); break
+            if confirmed then
+                misses=0
+                self.followHeight=3.8
+            else
+                misses=misses+1
+                -- Try a closer vertical offset after misses; target keeps moving.
+                self.followHeight=misses%2==0 and 2.8 or 3.3
+                if misses>=5 then
+                    self:note('No confirmed damage; retry target later')
+                    break
+                end
             end
         end
-        if not self:enemyValid(enemy) then
+        self:stopHover()
+        self.followHeight=3.8
+        local finalHP=enemy:GetAttribute('HP')
+        local dead=(type(finalHP)=='number' and finalHP<=0)
+            or enemy:GetAttribute('State')=='Dead'
+        if dead then
             self.stats.kills=self.stats.kills+1
-            self:note('Monster defeated')
+            self:note('Monster defeated (HP confirmed)')
             return true
         end
-        self.enemyRetry[enemy]=os.clock()+9
+        self.enemyRetry[enemy]=os.clock()+math.min(7,2+misses)
         return false
     end
 end

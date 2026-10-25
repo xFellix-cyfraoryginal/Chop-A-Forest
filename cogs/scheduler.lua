@@ -1,4 +1,4 @@
--- One scheduler. ATTACK clears nearby monsters first; FARM ignores them until damaged.
+-- V4.2: ATTACK sweeps all replicated monsters; FARM sweeps all trees.
 return function(C)
     function C:workStep()
         if self:isPaused() then
@@ -10,9 +10,9 @@ return function(C)
             self.stage='WAIT: backpack HUD'; task.wait(.45); return
         end
         if self.cfg.priority=='ATTACK' and self.cfg.combat then
-            local count=self:threats(self:position(),self.cfg.combatRadius)
+            local count=self:threats(self:position(),math.huge)
             if count>self.cfg.clearUntil then
-                local enemy=self:pickEnemy(self.cfg.combatRadius)
+                local enemy=self:pickEnemy(math.huge)
                 if enemy then self:fight(enemy); return end
             end
         end
@@ -48,7 +48,14 @@ return function(C)
         end
         local tree=self:chooseTree()
         if tree then self:chopTree(tree); return end
-        self.stage=wood>0 and 'WAIT: wood retry' or 'WAIT: no trees'
+        local info=self.treeScan or {}
+        if wood>0 then
+            self.stage='WAIT: wood retry ('..wood..')'
+        else
+            self.stage=string.format('NO TREES: valid %d / tracked %d / blocked %d',
+                info.valid or 0,info.cached or 0,info.blocked or 0)
+            if (info.cached or 0)==0 then self:scanTrees(true) end
+        end
         task.wait(.40)
     end
     function C:workLoop(session)
@@ -71,7 +78,7 @@ return function(C)
         self.hpHoldUntil=0; self.retaliateUntil=0; self.pendingHold=false
         local session=self.session
         self.stage='STARTING'
-        self:note('V4.1 '..self.cfg.priority..' FIRST / '..self.cfg.move)
+        self:note('V4.2 GLOBAL '..self.cfg.priority..' FIRST / '..self.cfg.move)
         task.spawn(function() self:watchSafety(session) end)
         task.spawn(function() self:workLoop(session) end)
     end

@@ -20,7 +20,7 @@ return function(C)
         hpPause = true, pauseHP = 0.40, pauseSeconds = 6,
         retaliateSeconds = 9, clearUntil = 1, combatRadius = 65,
         pickupRange = 3.7, treeRange = 3.7,
-        maxTreeDistance = 260, idlePause = .27,
+        maxTreeDistance = math.huge, idlePause = .15,
         useExperimental = false
     }
     C.toolAt, C.toolSlot = {}, ''
@@ -87,6 +87,7 @@ return function(C)
         end
     end
     function C:cancelMove()
+        if self.stopHover then self:stopHover() end
         self.motion = self.motion + 1
         local _, root, hum = self:character()
         if root and hum then hum:MoveTo(root.Position) end

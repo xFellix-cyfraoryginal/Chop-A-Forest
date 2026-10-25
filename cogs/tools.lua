@@ -151,12 +151,25 @@ return function(C)
         end
         if profile=='Axe' then self:pressSlot(2)
         elseif profile=='Fists' then self:pressSlot(1) end
-        if target then self:aimAt(target) end
+        -- Resolve moving targets only after cooldown; never aim at an old Vector3.
         local key=profile
         local now=os.clock()
         local waitUntil=math.max(self.toolAt[key] or 0,self.lastInputAt or 0)
         while self.running and not self:isPaused() and now<waitUntil do
             task.wait(math.min(.08,waitUntil-now)); now=os.clock()
+        end
+        if not self.running or self:isPaused() then return false end
+        local aimPoint=target
+        if type(target)=='function' then
+            local ok,pos=pcall(target)
+            if not ok or typeof(pos)~='Vector3' then
+                return false,'Target disappeared during cooldown'
+            end
+            aimPoint=pos
+        end
+        if aimPoint then
+            self:aimAt(aimPoint)
+            task.wait(.035) -- allow camera/input frame to observe the new aim
         end
         if not self.running or self:isPaused() then return false end
         local worked

@@ -21,7 +21,7 @@ return function(C)
         local ok,custom=pcall(gethui)
         if ok and custom then parent=custom end
     end
-    local gui=make('ScreenGui',{Name='CAF_ActionFirst_V4_1',ResetOnSpawn=false,
+    local gui=make('ScreenGui',{Name='CAF_GlobalHunt_V4_2',ResetOnSpawn=false,
         IgnoreGuiInset=true,ZIndexBehavior=Enum.ZIndexBehavior.Sibling},parent)
     C.gui=gui
     local panel=round(make('Frame',{Size=UDim2.fromOffset(394,382),
@@ -30,7 +30,7 @@ return function(C)
     local top=round(make('Frame',{Size=UDim2.new(1,0,0,48),
         BackgroundColor3=surface,BorderSizePixel=0},panel),12)
     make('TextLabel',{Size=UDim2.new(1,-92,1,0),Position=UDim2.fromOffset(13,0),
-        BackgroundTransparency=1,Text='CHOP A FOREST  /  ACTION FIRST V4.1',TextSize=14,
+        BackgroundTransparency=1,Text='CHOP A FOREST  /  GLOBAL HUNT V4.2',TextSize=14,
         Font=Enum.Font.GothamBold,TextColor3=ink,TextXAlignment=Enum.TextXAlignment.Left},top)
     local function button(parent,text,y,height,color,clicked)
         local b=round(make('TextButton',{Size=UDim2.new(1,-20,0,height or 37),
@@ -189,8 +189,10 @@ return function(C)
                 tostring(maxBag or '-'),wood)
             runButton.Text=C.running and 'STOP   [F8]' or 'START'
             runButton.BackgroundColor3=C.running and red or green
-            debugInfo.Text=string.format('Trees: %d   Logs: %d   Sold: %d   Kills: %d',
-                C.stats.trees,C.stats.collected,C.stats.sold,C.stats.kills)
+            local info=C.treeScan or {}
+            local threats=C:threats(C:position(),math.huge)
+            debugInfo.Text=string.format('Trees %d/%d  |  Mobs %d  |  Chopped %d  |  Kills %d',
+                info.valid or 0,info.cached or 0,threats,C.stats.trees,C.stats.kills)
             task.wait(.65)
         end
     end)
