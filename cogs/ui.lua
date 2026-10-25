@@ -27,7 +27,7 @@ return function(C)
     obj("TextLabel",{Size=UDim2.new(1,-104,1,0),Position=UDim2.fromOffset(15,0),
         BackgroundTransparency=1,TextXAlignment=Enum.TextXAlignment.Left,
         Font=Enum.Font.GothamBold,TextSize=14,TextColor3=colors.text,
-        Text="CROP FOREST  /  SMART FARM V3.2"},head)
+        Text="CROP FOREST  /  SMART FARM V3.3"},head)
     local function button(parent,text,x,y,w,h,col,click)
         local b=round(obj("TextButton",{Size=UDim2.fromOffset(w,h),
             Position=UDim2.fromOffset(x,y),BackgroundColor3=col,BorderSizePixel=0,
@@ -45,7 +45,7 @@ return function(C)
     end)
     content=obj("Frame",{Position=UDim2.fromOffset(0,48),Size=UDim2.new(1,0,1,-48),
         BackgroundTransparency=1},panel)
-    local names={"FARM","MOVE","COMBAT","SAFETY","CAMERA","EVENT","CONFIG","DEBUG"}
+    local names={"FARM","MOVE","COMBAT","SAFETY","EVENT","CONFIG","DEBUG"}
     local pages,tabBtns={},{}
     local tabs=obj("Frame",{Position=UDim2.fromOffset(12,8),Size=UDim2.new(1,-24,0,29),
         BackgroundTransparency=1},content)
@@ -125,7 +125,7 @@ return function(C)
     toggle(pages.FARM,"Prioritize Golden","goldFirst")
     options(pages.FARM,"Tree attack","attackMode",{"Input","Experimental Remote"})
     options(pages.FARM,"Tree tool slot","toolSlot",{"2","1","Auto"})
-    notice(pages.FARM,"Pickup: real mouse click, requires backpack count increase. No silent fake successes.")
+    notice(pages.FARM,"WOOD MEMORY: unfinished logs stay queued after danger, escape and failed pickup. F8 = emergency STOP.")
     options(pages.MOVE,"Movement","mode",{"Walk","Step TP","Instant TP"})
     number(pages.MOVE,"TP step speed","stepSpeed",8,180,2)
     number(pages.MOVE,"Tree attack delay","attackDelay",.45,3,.05)
@@ -140,6 +140,7 @@ return function(C)
     number(pages.MOVE,"Pickup approach","pickupDistance",2.5,7,.1)
     number(pages.MOVE,"Pickup delay","pickupDelay",.15,1,.05)
     number(pages.MOVE,"Pickup retries","pickupRetries",1,5,1)
+    number(pages.MOVE,"Recover wood range","maxLogDistance",80,650,10)
     toggle(pages.COMBAT,"Auto Combat","autoCombat")
     options(pages.COMBAT,"Combat mode","combatMode",{"Defend","Hunt"})
     options(pages.COMBAT,"Priority","combatPriority",{"Threats","Combat","Trees"})
@@ -165,13 +166,6 @@ return function(C)
     number(pages.SAFETY,"Heal timeout (sec)","healTimeout",10,120,5)
     notice(pages.SAFETY,"If HP is low or you are surrounded: interrupt the current action, retreat, hold until healed. If recovery fails: STOP. Emergency TP may be rejected by the server.")
     toggle(pages.COMBAT,"Highlight target","showMobs")
-    toggle(pages.CAMERA,"Free Look (no forced turning)","freeLook")
-    settingRow(pages.CAMERA,"Spectator / detach camera","OFF",function()
-        C:enableSpectator(not C.config.spectator)
-        return C.config.spectator and "ON" or "OFF"
-    end)
-    number(pages.CAMERA,"Spectator move speed","spectatorSpeed",8,120,2)
-    notice(pages.CAMERA,"Spectator: RMB + mouse rotate, arrow keys move, PgUp/PgDn height. You still see the world and bot marker. Input-mode attacks may MISS because the game uses camera direction. Free Look is safer. To restore view, switch Spectator OFF or UNLOAD.")
     toggle(pages.EVENT,"Graveyard trees only","eventOnly")
     toggle(pages.EVENT,"Graveyard mobs only","eventMobs")
     notice(pages.EVENT,"Mobs auto-detected by MonsterId, Monster, HP, MaxHP and State. Bosses are OFF by default for safety. No name whitelist.")
@@ -192,7 +186,7 @@ return function(C)
         Size=UDim2.new(1,-30,0,33),Text="IDLE",BackgroundTransparency=1,
         TextXAlignment=Enum.TextXAlignment.Left,Font=Enum.Font.Gotham,
         TextColor3=colors.muted,TextSize=11},content)
-    local start=button(content,"START",12,height-48-37,195,31,colors.green,function()
+    local start=button(content,"START / F8 STOP",12,height-48-37,195,31,colors.green,function()
         if C.running then C:stop() else C:start() end
     end)
     button(content,"EXPORT",216,height-48-37,102,31,colors.accent,function()
@@ -221,12 +215,13 @@ return function(C)
         accumulator=accumulator+dt
         if accumulator < .55 then return end
         accumulator=0
-        start.Text=C.running and "STOP" or "START"
+        start.Text=C.running and "STOP  [F8]" or "START"
         start.BackgroundColor3=C.running and colors.red or colors.green
         local bag,cap=C:backpack()
         local hp, maxHP = C:healthStatus()
-        status.Text=string.format("%s | HP %.0f/%.0f | BAG %s/%s | RETREATS %d",
-            C.stage,hp,maxHP,tostring(bag or "?"),tostring(cap or "?"),C.stats.retreats)
+        local wood=C:woodStatus(C.config.maxLogDistance)
+        status.Text=string.format("%s | HP %.0f/%.0f | BAG %s/%s | WOOD %d [%d ready]",
+            C.stage,hp,maxHP,tostring(bag or "?"),tostring(cap or "?"),wood.total,wood.ready)
         if active == "DEBUG" then
             local recent={}
             for i=math.max(1,#C.logs-10),#C.logs do

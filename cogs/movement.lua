@@ -86,7 +86,7 @@ return function(C)
             root.CFrame = CFrame.lookAt(root.Position, look)
         end
         local cam = self.ws.CurrentCamera
-        if cam and not self.config.freeLook and not self.config.spectator then
+        if cam then
             local from = cam.CFrame.Position
             local target = position + Vector3.new(0, 0.35, 0)
             cam.CFrame = CFrame.lookAt(from, target)

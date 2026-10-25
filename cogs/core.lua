@@ -25,8 +25,7 @@ return function(C)
         escapeMode = "Match farm", healTimeout = 30,
         kiteEnabled = true, orbitDistance = 4.6, kiteStep = 4.5,
         kiteRadius = 12, meleeDangerRadius = 5.5,
-        freeLook = false, spectator = false, spectatorSpeed = 36,
-        eventOnly = false, eventMobs = false
+        maxLogDistance = 360, eventOnly = false, eventMobs = false
     }
     C.alive = true
     C.running = false
@@ -49,6 +48,8 @@ return function(C)
     C.selectedSlot = "2"
     C.toolNextAt = {}
     C.toolObservedCooldown = {}
+    C.lastFellAt = -100
+    C.workTree = nil
     C.map = C.ws:FindFirstChild("Map")
     C.treeFolder = C.map and C.map:FindFirstChild("Trees")
     C.logFolder = C.ws:FindFirstChild("Logs")
@@ -101,6 +102,14 @@ return function(C)
         self.motionToken = self.motionToken + 1
         self.stage = "Stopped"
         self.targetEnemy = nil
+        self.target = nil
+        -- Release any held click immediately on panic stop.
+        if type(mouse1release)=="function" then pcall(mouse1release) end
+        local ok,vim=pcall(game.GetService,game,"VirtualInputManager")
+        if ok and vim and self.ws.CurrentCamera then
+            local xy=self.ws.CurrentCamera.ViewportSize/2
+            pcall(function() vim:SendMouseButtonEvent(xy.X,xy.Y,0,false,game,0) end)
+        end
         local _, _, hum = self:character()
         local pos = self:pos()
         if hum and pos then hum:MoveTo(pos) end
@@ -135,9 +144,11 @@ return function(C)
         end)
     end
     function C:export()
-        local data = {version = "Smart Farm V3.2", stats = self.stats, config = self.config,
+        local data = {version = "Smart Farm V3.3", stats = self.stats, config = self.config,
             state = self.stage, problem = self.lastIssue, logs = self.logs,
-            placeId = game.PlaceId, cash = self:cash()}
+            placeId = game.PlaceId, cash = self:cash(),
+            wood = self.woodStatus and self:woodStatus(self.config.maxLogDistance) or nil,
+            interruptedTree = self.workTree and self.workTree:GetAttribute("TreeId") or nil}
         local ok, payload = pcall(self.http.JSONEncode, self.http, data)
         if not ok then return false, payload end
         local name = "CropForest_AutoFarm_" .. os.date("!%Y%m%d_%H%M%S") .. ".json"
@@ -148,9 +159,19 @@ return function(C)
         if type(setclipboard) == "function" then pcall(setclipboard, payload) return true, "Schowek" end
         return false, "Brak writefile / setclipboard"
     end
+    -- Emergency STOP works regardless of the selected UI tab or movement state.
+    C:connect(C.uid.InputBegan,function(input)
+        if input.KeyCode ~= Enum.KeyCode.F8 then return end
+        if C.uid:GetFocusedTextBox() then return end
+        if C.running then
+            C:stop()
+            C:note('stop','F8: AWARYJNY STOP')
+        end
+    end)
     function C:unload()
         self:stop()
         self.alive = false
+        self.workTree = nil
         for _, conn in ipairs(self.connections) do pcall(function() conn:Disconnect() end) end
         for _, fn in ipairs(self.cleanup) do pcall(fn) end
         for _, v in pairs(self.vis) do pcall(function() v:Destroy() end) end
@@ -159,7 +180,7 @@ return function(C)
         -- Release our own strong references to world Instances and callback objects.
         for _, name in ipairs({"trees", "treeIndex", "treeCells", "treePositions",
             "drops", "enemies", "badEnemies", "vis", "failedTrees", "blockedTrees",
-            "connections", "cleanup", "logs", "logSpawnAt",
+            "connections", "cleanup", "logs", "logSpawnAt", "woodJobs",
             "toolNextAt", "toolObservedCooldown"}) do
             if type(self[name]) == "table" then table.clear(self[name]) end
         end

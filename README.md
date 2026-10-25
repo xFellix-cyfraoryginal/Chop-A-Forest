@@ -1,32 +1,43 @@
-# Chop-A-Forest — Smart Farm V3.2
+# Chop-A-Forest | Smart Farm V3.3 – Persistent Wood
 
-Repo: `xFellix-cyfraoryginal/Chop-A-Forest`. Pure Lua/Luau. `main.lua` fetches the cogs via raw GitHub, in order.
+**Repo:** `https://github.com/xFellix-cyfraoryginal/Chop-A-Forest`
 
-## Deploy
-Upload `main.lua`, every file in `cogs/` and `README.md` **preserving relative paths**. Commit them to branch `main`. Then start the existing loadstring:
+Repo contains only Luau `main.lua` and `cogs/` — no logger and no Python.
+
+## Installation
+
+1. Upload and commit **all** `main.lua` and `cogs/*.lua` from this ZIP to the root of the `main` branch.
+2. If replacing V3.2, delete obsolete `cogs/camera.lua` and `cogs/settle.lua` from the repo (not used anymore).
+3. Close and reopen Roblox to clear old spectator/camera callbacks and stale script sessions.
+4. Run in your executor:
 
 ```lua
-loadstring(game:HttpGet("https://raw.githubusercontent.com/xFellix-cyfraoryginal/Chop-A-Forest/main/main.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/xFellix-cyfraoryginal/Chop-A-Forest/main/main.lua?v=SmartFarm_3_3"))()
 ```
 
-All cogs have fewer than 300 lines. There is no Python or separate logger in the repository.
+Check the header says **SMART FARM V3.3** (not V3.1 / V3.2).
 
-## Changes in V3.2
+## Emergency key
 
-- `attack.lua`: Shared item cooldown limiter across attacks and pickup. Adjustable `itemCooldown` (default 0.62 s). If an equipped Roblox Tool exposes `AttackCooldown`, `SwingCooldown`, `Cooldown` or `AttackDelay`, honor it if longer (not a guarantee of game-specific slot cooldown). Cooldown gets refreshed on successful input; server's own cooldown always applies.
-- `settle.lua`: After tree is confirmed felled, wait until nearby logs exist, no new logs arrive, and their positions remain stable during falling animation. Max wait 6.5 s by default.
-- `world.lua`: Newly spawned logs cannot be picked immediately (min age 2.4 s). Attempts still require HUD bag increase to count as pickups. Per-tree collection prefers newly created logs, not existing drops from older trees.
-- `safety.lua` / `tactics.lua`: Crowd within 17 studs alone is not an emergency; steer around mobs during Walk. Retreat if critical HP, recent damage, boss or actual close crowd. Walk is default, and escape mode defaults to 'Match farm'.
-- `combat.lua`: Orbit target between attacks instead of only backing away, still requires real HP reduction for confirmed hits.
-- `movement.lua`: `face` may rotate body without forcing the camera if Free Look is on.
-- `camera.lua`: Optional independent camera, all rendering remains enabled, with character position marker. **Camera-dependent clicks can fail in spectator mode.** This is not verified silent aim.
-- No Eco switch; moderate UI/ESP cadence remains automatic.
+**F8** — cancel current walk, attack, collection and farm loop immediately. It does not unload the UI. Start again via START. Key disabled while typing into a Roblox textbox.
 
-## Test order
-1. Fresh Roblox session. Test Walk, free look OFF, spectator OFF. Tree -> falling animation -> logs -> Sell.
-2. Enable Free Look. Check whether tree hits/pickup still increase server HP/bag. If not, switch it OFF.
-3. Enable Spectator only after working with Free Look. The scene remains fully rendered; use RMB to rotate, arrows to move camera, PageUp/Down to raise/lower camera. Because game input may rely on camera aim, **this mode may break attacks/collection**. Turn it OFF if so.
-4. Enable Defend combat, Kite ON. Observe retreat behavior and HP. This is a prototype and not guaranteed to prevent deaths.
-5. Export DEBUG JSON for misses/timeouts. No logger required.
+## New wood scheduler
 
-No attempt to bypass game server hit validation. Do not assume client-side visuals equal server-confirmed successful actions.
+- Spawned logs are tracked as object instances in a persistent in-session wood-job table; old log jobs are removed only when corresponding game objects vanish.
+- One sampler (~0.23s when running) tests each log's movement and rotation. Only logs older than `logMinAge` and still for `logSettleTime` are eligible for pickup.
+- Wood is prioritized **before** the next tree; on safety retreat the jobs are kept and retried on recovery.
+- Failed pickups get individual exponential retry intervals (1.2–12 seconds), not permanent omission.
+- `maxLogDistance=360` studs by default. Adjust in MOVE if your map is larger.
+- Success requires actual backpack count increase. Dangerous logs are deferred, not forgotten. The bot will only sell after collecting reachable stable logs, or when bag is full.
+- Live panel displays `WOOD <pending> [<ready> ready]`.
+
+## Original functionality
+
+Walk, Step TP, Instant TP; tree chopping, combat by monster attributes, sale, event options and safety watchdog remain. Experimental spectator/free-look were removed. The standard input-camera alignment remains, as the game may use camera direction for swings and pickup clicks.
+
+**Important limitations**
+
+- Roblox server authority can still reject clicks, movement or combat; the developer cannot verify this client runtime.
+- If logs always stay in a dangerous spot, the bot safely defers those logs and may work elsewhere; it does not blindly run into mobs.
+- F8 emergency STOP does not remove UI or unload the code; UNLOAD cleans up the session.
+- Switching versions: restart Roblox before the new version if you previously used Spectator.

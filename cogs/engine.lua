@@ -1,124 +1,128 @@
--- Main state-machine: tree -> confirmed pickup -> deposit, optionally fighting real monsters.
+-- Priority scheduler: emergency > full bag > remembered wood > combat > tree.
+-- Wood jobs survive danger, missed clicks, movement failure, and incomplete chops.
 return function(C)
     function C:doTree(tree)
-        self.stage = "Move to tree"
-        self.target = tree
-        self.preFellLogs = {}
-        for log in pairs(self.drops) do self.preFellLogs[log] = true end
+        self.target=tree
+        self.workTree=tree
+        self.stage='Go tree'
         if not self:moveToTree(tree) then
-            self:note("warn", "Nie moge dojsc do drzewa")
-            self.target = nil
+            self.target=nil
             return false
         end
-        self.stage = "Chop"
         self:chooseTool()
-        local failures, swings = 0, 0
-        while self.running and not self.safetyAlert and self:treeOK(tree) and swings < 45 do
-            local part, root = self:trunk(tree), self:pos()
-            if not part or not root then self.target = nil return false end
-            if (part.Position - root).Magnitude > math.max(6.5, self.config.hitDistance + 2) then
-                if not self:moveToTree(tree) then self.target = nil return false end
+        local failures,swings=0,0
+        self.stage='Chop'
+        while self.running and not self.safetyAlert and self:treeOK(tree) and swings<45 do
+            local part,p=self:trunk(tree),self:pos()
+            if not part or not p then break end
+            if (part.Position-p).Magnitude>math.max(6.5,self.config.hitDistance+2) then
+                if not self:moveToTree(tree) then break end
             end
             if self.safetyAlert then break end
-            if self:attackTree(tree) then
-                failures = 0
+            if self:attackTree(tree) then failures=0
             else
-                failures = failures + 1
-                if failures >= self.config.maxFailures then
-                    self:note("warn", "Drzewo bez obrazen; pomijam #" .. tostring(tree:GetAttribute("TreeId")))
-                    self.target = nil
-                    return false
-                end
+                failures=failures+1
+                if failures>=self.config.maxFailures then break end
             end
-            swings = swings + 1
-            if not self.running or self.safetyAlert then break end
+            swings=swings+1
             task.wait(.06)
         end
-        self.target = nil
-        if tree.Parent and (tree:GetAttribute("Felled") == true or (tree:GetAttribute("HP") or 1) <= 0) then
-            self.stats.felled = self.stats.felled + 1
-            self:note("tree", "Scieto #" .. tostring(tree:GetAttribute("TreeId")))
+        self.target=nil
+        local felled=tree.Parent and (tree:GetAttribute('Felled')==true
+            or (tree:GetAttribute('HP') or 1)<=0)
+        if felled then
+            self.workTree=nil
+            self.stats.felled=self.stats.felled+1
+            self.lastFellAt=os.clock()
+            self:note('tree','Scieto '..tostring(tree:GetAttribute('TreeId'))
+                ..'; czekam na stabilne drewno')
             return true
         end
         return false
     end
 
     function C:engine(session)
-        local lastRescue = 0
-        while self.running and self.alive and session == self.sessionId do
-            local bag, cap = self:backpack()
+        local nextIdleCheck=0
+        while self.running and self.alive and session==self.sessionId do
             if self.safetyAlert then
+                -- Do NOT clear woodJobs: pickup is resumed after recovery.
                 self:retreatNow()
-            elseif bag == nil then
-                self.stage = "Waiting HUD"
-                self:note("warn", "Czekam na ChopHud.Backpack.Count")
-                task.wait(1)
-            elseif self.config.kiteEnabled and self:tryAvoidCrowd() then
-                -- Short sidestep in Walk mode; only actual injury/critical threats panic.
-            elseif self.config.autoSell and cap and bag >= cap and self.config.sellWhenFull then
-                self:sellLogs()
-            elseif self.config.autoCombat and self.config.combatPriority == "Combat"
-                and self:combatTick(false) then
-                -- Active combat/hunt mode gives the monster system priority.
-            elseif self.config.autoCombat and self.config.combatPriority == "Threats"
-                and self:combatTick(true) then
-                -- Only nearby threats interrupt the normal wood loop.
             else
-                local leftovers = self.config.autoCollect and self:nearestLog(40)
-                if leftovers and os.clock() - lastRescue > 5 then
-                    local before = bag
-                    self:collectLogs()
-                    lastRescue = os.clock()
-                    local after = self:backpack()
-                    if not self.safetyAlert and self.config.autoSell
-                        and self.config.sellAfterTree and after and after > before then
-                        self:sellLogs()
-                    end
+                local bag,cap=self:backpack()
+                if bag==nil then
+                    self.stage='Wait HUD'; task.wait(.65)
+                elseif self.config.autoSell and cap and bag>=cap and self.config.sellWhenFull then
+                    self:sellLogs()
                 else
-                    local tree = self:pickTree()
-                    if not tree then
-                        if self.config.autoCombat and self.config.combatMode == "Hunt" then
-                            if not self:combatTick(false) then
-                                self.stage = "Waiting trees / enemies"
-                                task.wait(1.5)
-                            end
-                        else
-                            self.stage = "No eligible trees"
-                            task.wait(1.7)
+                    local wood=self.config.autoCollect and self:woodStatus(self.config.maxLogDistance)
+                    if wood and wood.ready>0 then
+                        self.stage='Recover wood ('..wood.total..')'
+                        local picked=self:collectLogs()
+                        local after=self:backpack()
+                        -- Sell only when full, or finished collecting all reachable wood.
+                        local remaining=self:woodStatus(self.config.maxLogDistance)
+                        if self.running and not self.safetyAlert and self.config.autoSell
+                            and after and after>0 and (self.config.sellWhenFull and cap and after>=cap
+                                or self.config.sellAfterTree
+                                    and remaining.ready==0 and remaining.settling==0) then
+                            self:sellLogs()
                         end
-                        -- Keep failure history; do not retry one broken tree endlessly.
+                        if picked==0 then task.wait(.25) end
+                    elseif wood and wood.settling>0 then
+                        -- Waiting has priority immediately after chopping and after retreat.
+                        self.stage='Wait logs animation ('..wood.settling..')'
+                        task.wait(.28)
+                    elseif self.config.autoCombat and self.config.combatPriority=='Combat'
+                        and self:combatTick(false) then
+                        -- Optional hunting when no wood is waiting.
+                    elseif self.config.autoCombat and self.config.combatPriority=='Threats'
+                        and self:combatTick(true) then
+                        -- Close-by enemies are handled before chopping more trees.
                     else
-                        local success = self:doTree(tree)
-                        if success then
-                            self.failedTrees[tree] = nil
-                            if self.config.autoCollect and not self.safetyAlert then
-                                local ready = self:waitForWood(tree)
-                                if not self.safetyAlert then self:collectLogs(ready) end
-                                self.preFellLogs = nil
-                            end
-                            if self.config.autoSell and not self.safetyAlert then
-                                local count, capacity = self:backpack()
-                                if (self.config.sellAfterTree and count and count > 0)
-                                    or (self.config.sellWhenFull and count and capacity and count >= capacity) then
-                                    self:sellLogs()
-                                end
-                            end
+                        if self.config.autoSell and self.config.sellAfterTree and bag>0
+                            and (not wood or wood.ready==0 and wood.settling==0)
+                            and (os.clock()-(self.lastFellAt or -100)>1.5) then
+                            self:sellLogs()
                         else
-                            if not self.safetyAlert then
-                                self.stats.failures = self.stats.failures + 1
-                                self.failedTrees[tree] = (self.failedTrees[tree] or 0) + 1
-                                if self.failedTrees[tree] >= self.config.maxFailures then
-                                    self.blockedTrees[tree] = os.clock() + 45
-                                    self.failedTrees[tree] = 0
+                            if self.config.kiteEnabled and self:tryAvoidCrowd() then
+                                -- Side-step when mob blocks a safe route.
+                            else
+                                local tree=self.workTree
+                                if tree then
+                                    local part=self:trunk(tree)
+                                    if not self:treeOK(tree) or not part
+                                        or (self.blockedTrees[tree] or 0)>os.clock()
+                                        or (self.locationRisk and self:locationRisk(part.Position)) then
+                                        tree=nil
+                                    end
+                                end
+                                tree=tree or self:pickTree()
+                                if tree then
+                                    local success=self:doTree(tree)
+                                    if success then self.failedTrees[tree]=nil
+                                    elseif not self.safetyAlert then
+                                        self.workTree=nil
+                                        self.stats.failures=self.stats.failures+1
+                                        self.failedTrees[tree]=(self.failedTrees[tree] or 0)+1
+                                        if self.failedTrees[tree]>=self.config.maxFailures then
+                                            self.blockedTrees[tree]=os.clock()+45
+                                            self.failedTrees[tree]=0
+                                        end
+                                    end
+                                elseif self.config.autoCombat and self.config.combatMode=='Hunt'
+                                    and self:combatTick(false) then
+                                else
+                                    self.stage='Waiting for safe task'
+                                    task.wait(1)
                                 end
                             end
                         end
                     end
                 end
             end
-            task.wait(.2)
+            task.wait(.16)
         end
-        self.target = nil
-        self.targetEnemy = nil
+        self.target=nil
+        self.targetEnemy=nil
     end
 end
