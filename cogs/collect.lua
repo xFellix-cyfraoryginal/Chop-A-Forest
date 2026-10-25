@@ -10,7 +10,7 @@ return function(C)
             if self:nearestLog(90) then break end
             task.wait(0.13)
         end
-        while self.running and self.alive and attempts < 42 do
+        while self.running and self.alive and not self.safetyAlert and attempts < 42 do
             local before, capacity = self:backpack()
             if before == nil then
                 self:note("error", "Brak licznika plecaka; pomijam pickup")
@@ -34,7 +34,8 @@ return function(C)
             -- On V7 pickups worked with MouseLeft and no prompt. Aim at the nearby log.
             local success = false
             for try = 1, self.config.pickupRetries do
-                if not self.running or not self.alive or not self:logPart(log) then break end
+                if not self.running or not self.alive or self.safetyAlert
+                    or not self:logPart(log) then break end
                 local root = self:pos()
                 if not root then break end
                 if (root - part.Position).Magnitude > self.config.pickupDistance + 2 then
@@ -94,7 +95,7 @@ return function(C)
             return false
         end
         for attempt = 1, 3 do
-            if not self.running then return false end
+            if not self.running or self.safetyAlert then return false end
             local now = self:backpack()
             if now == 0 then
                 self.stats.sold = self.stats.sold + 1

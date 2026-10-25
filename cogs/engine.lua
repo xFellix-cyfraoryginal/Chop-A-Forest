@@ -11,12 +11,13 @@ return function(C)
         self.stage = "Chop"
         self:chooseTool()
         local failures, swings = 0, 0
-        while self.running and self:treeOK(tree) and swings < 45 do
+        while self.running and not self.safetyAlert and self:treeOK(tree) and swings < 45 do
             local part, root = self:trunk(tree), self:pos()
             if not part or not root then self.target = nil return false end
             if (part.Position - root).Magnitude > math.max(6.5, self.config.hitDistance + 2) then
                 if not self:moveToTree(tree) then self.target = nil return false end
             end
+            if self.safetyAlert then break end
             if self:attackTree(tree) then
                 failures = 0
             else
@@ -28,7 +29,7 @@ return function(C)
                 end
             end
             swings = swings + 1
-            if not self.running then break end
+            if not self.running or self.safetyAlert then break end
             task.wait(.06)
         end
         self.target = nil
@@ -40,11 +41,13 @@ return function(C)
         return false
     end
 
-    function C:engine()
+    function C:engine(session)
         local lastRescue = 0
-        while self.running and self.alive do
+        while self.running and self.alive and session == self.sessionId do
             local bag, cap = self:backpack()
-            if bag == nil then
+            if self.safetyAlert then
+                self:retreatNow()
+            elseif bag == nil then
                 self.stage = "Waiting HUD"
                 self:note("warn", "Czekam na ChopHud.Backpack.Count")
                 task.wait(1)
@@ -63,7 +66,8 @@ return function(C)
                     self:collectLogs()
                     lastRescue = os.clock()
                     local after = self:backpack()
-                    if self.config.autoSell and self.config.sellAfterTree and after and after > before then
+                    if not self.safetyAlert and self.config.autoSell
+                        and self.config.sellAfterTree and after and after > before then
                         self:sellLogs()
                     end
                 else
@@ -78,16 +82,16 @@ return function(C)
                             self.stage = "No eligible trees"
                             task.wait(1.7)
                         end
-                        self.failedTrees = {}
+                        -- Keep failure history; do not retry one broken tree endlessly.
                     else
                         local success = self:doTree(tree)
                         if success then
                             self.failedTrees[tree] = nil
-                            if self.config.autoCollect then
+                            if self.config.autoCollect and not self.safetyAlert then
                                 task.wait(.17)
-                                self:collectLogs()
+                                if not self.safetyAlert then self:collectLogs() end
                             end
-                            if self.config.autoSell then
+                            if self.config.autoSell and not self.safetyAlert then
                                 local count, capacity = self:backpack()
                                 if (self.config.sellAfterTree and count and count > 0)
                                     or (self.config.sellWhenFull and count and capacity and count >= capacity) then
@@ -95,13 +99,19 @@ return function(C)
                                 end
                             end
                         else
-                            self.stats.failures = self.stats.failures + 1
-                            self.failedTrees[tree] = (self.failedTrees[tree] or 0) + 1
+                            if not self.safetyAlert then
+                                self.stats.failures = self.stats.failures + 1
+                                self.failedTrees[tree] = (self.failedTrees[tree] or 0) + 1
+                                if self.failedTrees[tree] >= self.config.maxFailures then
+                                    self.blockedTrees[tree] = os.clock() + 45
+                                    self.failedTrees[tree] = 0
+                                end
+                            end
                         end
                     end
                 end
             end
-            task.wait(.17)
+            task.wait(self.config.perfMode == "Eco" and .32 or .17)
         end
         self.target = nil
         self.targetEnemy = nil

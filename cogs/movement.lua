@@ -1,12 +1,6 @@
 return function(C)
-    local function waitUntil(token, seconds)
-        local deadline = os.clock() + seconds
-        while C.alive and C.running and token == C.motionToken and os.clock() < deadline do
-            task.wait(0.07)
-        end
-        return C.alive and C.running and token == C.motionToken
-    end
-    function C:move(position, stopAt)
+    function C:move(position, stopAt, isEscape)
+        if self.safetyAlert and not isEscape then return false end
         local _, root, hum = self:character()
         if not root or not position then return false end
         self.motionToken = self.motionToken + 1
@@ -25,7 +19,8 @@ return function(C)
             local dist = (p - last).Magnitude
             local steps = math.clamp(math.ceil(dist / math.max(self.config.stepSpeed * 0.08, 1)), 1, 180)
             for i = 1, steps do
-                if not self.running or token ~= self.motionToken then return false end
+                if not self.running or token ~= self.motionToken
+                    or (self.safetyAlert and not isEscape) then return false end
                 local nextPos = last:Lerp(p, i / steps)
                 root.CFrame = CFrame.new(nextPos) * root.CFrame.Rotation
                 task.wait(0.08)
@@ -36,29 +31,40 @@ return function(C)
         local function moveToPoint(v)
             hum:MoveTo(v)
             local deadline = os.clock() + math.clamp((v - root.Position).Magnitude / math.max(hum.WalkSpeed, 8) + 2.2, 2.5, 18)
-            while self.running and token == self.motionToken and os.clock() < deadline do
+            while self.running and token == self.motionToken and os.clock() < deadline
+                and (isEscape or not self.safetyAlert) do
                 if (root.Position - v).Magnitude <= (stopAt or 3.0) then return true end
                 if hum.Health <= 0 then return false end
                 task.wait(0.12)
             end
             return (root.Position - v).Magnitude <= (stopAt or 3.0)
         end
-        local ok, path = pcall(function()
-            local pathObj = self.pathService:CreatePath({AgentRadius = 2, AgentHeight = 5, AgentCanJump = true})
-            pathObj:ComputeAsync(root.Position, p)
-            return pathObj
-        end)
-        if ok and path and path.Status == Enum.PathStatus.Success then
-            for _, node in ipairs(path:GetWaypoints()) do
-                if not self.running or token ~= self.motionToken then return false end
-                if node.Action == Enum.PathWaypointAction.Jump then hum.Jump = true end
-                if not moveToPoint(node.Position) then break end
+        -- Most log pickups are a few studs away: don't allocate/compute a Path.
+        local path
+        if distance > 13 then
+            local success = pcall(function()
+                path = self.pathService:CreatePath({AgentRadius=2,AgentHeight=5,AgentCanJump=true})
+                path:ComputeAsync(root.Position,p)
+            end)
+            if success and path and path.Status == Enum.PathStatus.Success then
+                for _, node in ipairs(path:GetWaypoints()) do
+                    if not self.running or token ~= self.motionToken
+                        or (self.safetyAlert and not isEscape) then break end
+                    if node.Action == Enum.PathWaypointAction.Jump then hum.Jump = true end
+                    if not moveToPoint(node.Position) then break end
+                end
             end
         end
-        if self.running and (root.Position - p).Magnitude > (stopAt or 3) then
+        -- Path is an Instance; explicitly release it, including failed paths.
+        if path then pcall(function() path:Destroy() end) end
+        if not self.running or token ~= self.motionToken
+            or (self.safetyAlert and not isEscape) then return false end
+        if (root.Position - p).Magnitude > (stopAt or 3) then
             moveToPoint(p)
         end
-        return self.running and (root.Position - p).Magnitude < (stopAt or 3.5) + 1
+        return self.running and token == self.motionToken
+            and (isEscape or not self.safetyAlert)
+            and (root.Position - p).Magnitude < (stopAt or 3.5) + 1
     end
     function C:moveToTree(tree)
         local trunk = self:trunk(tree)

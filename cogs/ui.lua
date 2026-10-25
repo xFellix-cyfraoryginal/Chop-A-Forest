@@ -15,7 +15,7 @@ return function(C)
         return v
     end
     local parent = type(gethui)=="function" and gethui() or game:GetService("CoreGui")
-    local gui=obj("ScreenGui",{Name="ChopAForest_CS_V2",ResetOnSpawn=false,
+    local gui=obj("ScreenGui",{Name="ChopAForest_CS_V3",ResetOnSpawn=false,
         IgnoreGuiInset=true,ZIndexBehavior=Enum.ZIndexBehavior.Sibling},parent)
     C.gui=gui
     local width,height=454,470
@@ -27,7 +27,7 @@ return function(C)
     obj("TextLabel",{Size=UDim2.new(1,-104,1,0),Position=UDim2.fromOffset(15,0),
         BackgroundTransparency=1,TextXAlignment=Enum.TextXAlignment.Left,
         Font=Enum.Font.GothamBold,TextSize=14,TextColor3=colors.text,
-        Text="CROP FOREST  /  ALPHA V2"},head)
+        Text="CROP FOREST  /  SURVIVAL V3.1 LITE"},head)
     local function button(parent,text,x,y,w,h,col,click)
         local b=round(obj("TextButton",{Size=UDim2.fromOffset(w,h),
             Position=UDim2.fromOffset(x,y),BackgroundColor3=col,BorderSizePixel=0,
@@ -45,7 +45,7 @@ return function(C)
     end)
     content=obj("Frame",{Position=UDim2.fromOffset(0,48),Size=UDim2.new(1,0,1,-48),
         BackgroundTransparency=1},panel)
-    local names={"FARM","MOVE","COMBAT","EVENT","CONFIG","DEBUG"}
+    local names={"FARM","MOVE","COMBAT","SAFETY","EVENT","CONFIG","DEBUG"}
     local pages,tabBtns={},{}
     local tabs=obj("Frame",{Position=UDim2.fromOffset(12,8),Size=UDim2.new(1,-24,0,29),
         BackgroundTransparency=1},content)
@@ -142,15 +142,28 @@ return function(C)
     number(pages.COMBAT,"Attack distance","combatReach",3,10,.5)
     number(pages.COMBAT,"Enemy search range","combatSearch",15,350,5)
     number(pages.COMBAT,"Combat hit delay","combatDelay",.35,2,.05)
-    number(pages.COMBAT,"Stop when HP <=","combatHealth",5,90,1)
+    number(pages.COMBAT,"Absolute HP floor","combatHealth",30,95,1)
+    toggle(pages.COMBAT,"Allow bosses (risky)","allowBoss")
+    toggle(pages.SAFETY,"Survival watchdog","safetyOn")
+    toggle(pages.SAFETY,"Avoid dangerous trees/logs","avoidMobs")
+    number(pages.SAFETY,"Retreat at HP %","panicPercent",35,95,5)
+    number(pages.SAFETY,"Resume at HP %","resumePercent",60,100,5)
+    number(pages.SAFETY,"Mob crowd limit","maxThreats",1,5,1)
+    number(pages.SAFETY,"Threat radius","dangerRadius",8,30,1)
+    number(pages.SAFETY,"Keep away from mobs","avoidDistance",4,22,1)
+    options(pages.SAFETY,"Emergency escape","escapeMode",{"Instant TP","Step TP","Match farm"})
+    number(pages.SAFETY,"Heal timeout (sec)","healTimeout",10,120,5)
+    notice(pages.SAFETY,"If HP is low or you are surrounded: interrupt the current action, retreat, hold until healed. If recovery fails: STOP. Emergency TP may be rejected by the server.")
     toggle(pages.COMBAT,"Highlight target","showMobs")
     toggle(pages.EVENT,"Graveyard trees only","eventOnly")
     toggle(pages.EVENT,"Graveyard mobs only","eventMobs")
-    notice(pages.EVENT,"Mobs auto-detected by MonsterId, Monster, HP, MaxHP and State. Guardians (bosses) get priority. No name whitelist.")
+    notice(pages.EVENT,"Mobs auto-detected by MonsterId, Monster, HP, MaxHP and State. Bosses are OFF by default for safety. No name whitelist.")
     local eventLabel=obj("TextLabel",{Size=UDim2.new(1,-7,0,46),Text="Event scan...",
         TextColor3=colors.muted,Font=Enum.Font.Code,TextSize=12,
         TextXAlignment=Enum.TextXAlignment.Left,BackgroundColor3=colors.panel},pages.EVENT)
     round(eventLabel,7)
+    options(pages.CONFIG,"Performance","perfMode",{"Eco","Normal"})
+    notice(pages.CONFIG,"Eco: slower UI/ESP refresh, fewer world scans, safe cleanup. Safety checks stay fast during farming.")
     number(pages.CONFIG,"Tree failures limit","maxFailures",1,8,1)
     toggle(pages.CONFIG,"Highlight tree","showTree")
     toggle(pages.CONFIG,"Highlight logs","showLogs")
@@ -190,21 +203,24 @@ return function(C)
     C:connect(game:GetService("RunService").Heartbeat,function(dt)
         if not C.alive then return end
         accumulator=accumulator+dt
-        if accumulator<.45 then return end
+        if accumulator < (C.config.perfMode == "Eco" and 1 or .45) then return end
         accumulator=0
         start.Text=C.running and "STOP" or "START"
         start.BackgroundColor3=C.running and colors.red or colors.green
         local bag,cap=C:backpack()
-        status.Text=string.format("%s  |  BAG %s/%s  |  TREES %d  |  LOGS %d  |  KILLS %d",
-            C.stage,tostring(bag or "?"),tostring(cap or "?"),C.stats.felled,
-            C.stats.pickups,C.stats.mobKills)
-        local recent={}
-        for i=math.max(1,#C.logs-10),#C.logs do
-            if C.logs[i] then table.insert(recent,C.logs[i].level.."  "..C.logs[i].message) end
+        local hp, maxHP = C:healthStatus()
+        status.Text=string.format("%s | HP %.0f/%.0f | BAG %s/%s | RETREATS %d",
+            C.stage,hp,maxHP,tostring(bag or "?"),tostring(cap or "?"),C.stats.retreats)
+        if active == "DEBUG" then
+            local recent={}
+            for i=math.max(1,#C.logs-10),#C.logs do
+                if C.logs[i] then table.insert(recent,C.logs[i].level.."  "..C.logs[i].message) end
+            end
+            debug.Text=table.concat(recent,"\n")
+        elseif active == "EVENT" then
+            local event=C:eventInfo()
+            eventLabel.Text=string.format("AREA: %s\nTIME: %.1f  |  MOBS: %d  |  BOSSES: %d",
+                event.areaName or "?",event.clock,event.minions,event.bosses)
         end
-        debug.Text=table.concat(recent,"\n")
-        local event=C:eventInfo()
-        eventLabel.Text=string.format("AREA: %s\nTIME: %.1f  |  MOBS: %d  |  BOSSES: %d",
-            event.areaName or "?",event.clock,event.minions,event.bosses)
     end)
 end

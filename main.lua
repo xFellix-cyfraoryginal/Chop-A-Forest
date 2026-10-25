@@ -1,4 +1,4 @@
--- Chop A Forest | Auto Farm Alpha 2 / Halloween
+-- Chop A Forest | Auto Farm V3.1 / Low-memory Survival
 -- GitHub loader: nie wymaga ustawiania loginu ani getgenv().CROPFOREST_BASE_URL
 -- Repozytorium: https://github.com/xFellix-cyfraoryginal/Chop-A-Forest
 local BASE = "https://raw.githubusercontent.com/xFellix-cyfraoryginal/Chop-A-Forest/main/"
@@ -10,6 +10,7 @@ local COGS = {
     "cogs/collect.lua",
     "cogs/combat.lua",
     "cogs/event.lua",
+    "cogs/safety.lua",
     "cogs/engine.lua",
     "cogs/esp.lua",
     "cogs/ui.lua",

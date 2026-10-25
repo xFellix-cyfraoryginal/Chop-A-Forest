@@ -11,21 +11,27 @@ return function(C)
         attackMode = "Input", toolSlot = "2", hitDistance = 3.8,
         sellAfterTree = true, sellWhenFull = true,
         autoCollect = true, autoSell = true, goldFirst = false,
-        showTree = true, showLogs = false, selectedArea = "Current",
+        showTree = false, showLogs = false, selectedArea = "Current",
         maxFailures = 3, maxTreeDistance = 220,
         pickupDistance = 4.6, pickupDelay = 0.32, pickupRetries = 3,
         autoCombat = false, combatMode = "Defend", combatPriority = "Threats",
         combatSearch = 75, combatReach = 5, combatDelay = 0.57,
-        combatTool = "2", combatHealth = 22, showMobs = true,
-        eventOnly = false, eventMobs = false
+        combatTool = "2", combatHealth = 65, showMobs = false,
+        allowBoss = false, safetyOn = true, avoidMobs = true,
+        panicPercent = 65, resumePercent = 90, maxThreats = 2,
+        dangerRadius = 17, avoidDistance = 9, safeDistance = 26,
+        escapeMode = "Instant TP", healTimeout = 30,
+        eventOnly = false, eventMobs = false, perfMode = "Eco"
     }
     C.alive = true
     C.running = false
+    C.workerAlive = false
     C.motionToken = 0
     C.logs = {}
-    C.logLimit = 220
+    C.logLimit = 140
+    C.sessionId = 0
     C.stats = {felled = 0, pickups = 0, sold = 0, hits = 0, failures = 0,
-        mobHits = 0, mobKills = 0, combatFailures = 0}
+        mobHits = 0, mobKills = 0, combatFailures = 0, retreats = 0, damageTaken = 0}
     C.stage = "Idle"
     C.target = nil
     C.targetEnemy = nil
@@ -81,7 +87,9 @@ return function(C)
         return cash and cash.Value or nil
     end
     function C:stop()
+        self.sessionId = self.sessionId + 1
         self.running = false
+        self.safetyAlert = false
         self.motionToken = self.motionToken + 1
         self.stage = "Stopped"
         self.targetEnemy = nil
@@ -92,11 +100,26 @@ return function(C)
     end
     function C:start()
         if self.running or not self.alive then return end
+        if self.workerAlive then
+            self:note("warn", "Poprzednia petla jeszcze sie zatrzymuje; sproboj ponownie")
+            return
+        end
         if not self.treeFolder then self:note("error", "Brak Workspace.Map.Trees") return end
+        local hp, cap = self:healthStatus()
+        if self.config.safetyOn and hp <= self:panicFloor(cap) then
+            self:note("danger", "Nie uruchamiam farmy z tak niskim HP: " .. math.floor(hp))
+            return
+        end
+        self.safetyAlert = false
+        self.sessionId = self.sessionId + 1
+        local session = self.sessionId
         self.running = true
+        self.workerAlive = true
         self:note("info", "Auto Farm uruchomiony")
         task.spawn(function()
-            local ok, err = pcall(function() self:engine() end)
+            local ok, err = pcall(function() self:engine(session) end)
+            self.workerAlive = false
+            if session ~= self.sessionId then return end
             if not ok then self:note("error", err) end
             self.running = false
             self.targetEnemy = nil
@@ -104,7 +127,7 @@ return function(C)
         end)
     end
     function C:export()
-        local data = {version = "Alpha 2 - Event Combat", stats = self.stats, config = self.config,
+        local data = {version = "Survival V3.1 - Lite", stats = self.stats, config = self.config,
             state = self.stage, problem = self.lastIssue, logs = self.logs,
             placeId = game.PlaceId, cash = self:cash()}
         local ok, payload = pcall(self.http.JSONEncode, self.http, data)
@@ -125,6 +148,12 @@ return function(C)
         for _, v in pairs(self.vis) do pcall(function() v:Destroy() end) end
         if self.gui then self.gui:Destroy() end
         if self.espFolder then self.espFolder:Destroy() end
+        -- Release our own strong references to world Instances and callback objects.
+        for _, name in ipairs({"trees", "treeIndex", "treeCells", "treePositions",
+            "drops", "enemies", "badEnemies", "vis", "failedTrees", "blockedTrees",
+            "connections", "cleanup", "logs"}) do
+            if type(self[name]) == "table" then table.clear(self[name]) end
+        end
         local env = type(getgenv) == "function" and getgenv() or _G
         if env.CAF_ALPHA == self then env.CAF_ALPHA = nil end
     end

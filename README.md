@@ -1,56 +1,34 @@
-# Chop-A-Forest — Auto Farm Alpha V2
+# Chop-A-Forest | Auto Farm Survival V3.1 Lite
 
-**100% Luau**, bez Pythona, bez loggerów w repo. Lekki `main.lua` pobiera 10 niezależnych cogów (każdy poniżej 300 linii). Repo jest skonfigurowane dla `xFellix-cyfraoryginal/Chop-A-Forest` na gałęzi `main` — **nie trzeba podawać loginu ani `getgenv()`**.
+Single-language **Luau** source, GitHub RAW loader and `cogs/` modules. **No Python and no loggers** in this repository.
 
-## Drzewo plików
+### Changes from V3
+- Defaults: **Performance: Eco**, tree/log/mob highlights disabled (you can enable them in CONFIG and COMBAT).
+- Tree selection uses 96-stud spatial cells instead of scanning all trees every iteration.
+- Area identification cached briefly while player stays near the same position.
+- Successful/failed walking path objects are released with `:Destroy()`; short journeys skip pathfinding.
+- UI and optional visuals update less frequently on Eco. Safety watchdog **still checks rapidly** when the farm is running.
+- STOP/START race fixed using a session token; stale loops cannot turn off a newly started farm.
+- Broken trees get a temporary retry cooldown, preventing wasteful retry loops.
+- UNLOAD clears cached world data, visual objects and event connections.
 
-```text
-Chop-A-Forest/
-├── main.lua
-├── cogs/
-│   ├── core.lua
-│   ├── world.lua
-│   ├── movement.lua
-│   ├── attack.lua
-│   ├── collect.lua
-│   ├── combat.lua
-│   ├── event.lua
-│   ├── engine.lua
-│   ├── esp.lua
-│   └── ui.lua
-├── README.md
-└── .gitignore
-```
+### Installation
+Upload `main.lua` and `cogs/` (preserve directory names) to your existing repository:
+`https://github.com/xFellix-cyfraoryginal/Chop-A-Forest`
 
-## Instalacja
-
-Podmień pliki w repo GitHub, zachowując ścieżki. Wszystkie nowe cogi **muszą** zostać wrzucone razem ze zmienionym `main.lua`. Repo musi być publiczne, żeby `game:HttpGet()` pobierał RAW plików.
-
+Then run through your executor:
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/xFellix-cyfraoryginal/Chop-A-Forest/main/main.lua"))()
 ```
 
-Po uruchomieniu włącza się panel. Kliknij `START`, aby uruchomić Auto Farm. `STOP` zatrzymuje, `UNLOAD` całkowicie odłącza.
+### Important memory warning
+A Task Manager snapshot showing about **10 GB Roblox RAM before injecting V3** cannot be explained by V3.1. Shut down every Roblox client process, restart and measure idle memory **before** testing. Roblox asset memory / engine caching is not released by running garbage collection in a Luau script. We do not claim a reduction of the game's native memory use.
 
-## Co nowego
+### Testing
+1. Relaunch Roblox, note idle RAM, CPU and GPU in Task Manager.
+2. Run Auto Farm in Eco mode; keep all highlights OFF for baseline.
+3. Test 1 tree, automatic log pickup and Sell; watch real backpack changes.
+4. Enable Defend only after collecting works. Bosses stay OFF. Safety stays ON.
+5. Compare baseline and RAM after 5-10 minutes. For rising memory, export DEBUG JSON and report measured usage at both times.
 
-- **Auto Collect V2**: podejście do `Workspace.Logs.Log`, skierowanie kursora/kamery, symulacja lewego kliknięcia, potwierdzenie wzrostu `PlayerGui.ChopHud.Backpack.Count`; próby ponowne i ignorowanie problematycznych kłód w bieżącej serii. **Nie zakłada sukcesu od samego TP ani od zniknięcia kłody.**
-- **Auto Sell**: docelowo `Workspace.Map.SellSpot.DepositPad`, wejście w strefę i próba kliknięcia, potwierdzenie `0/5` z licznika plecaka.
-- **Auto Combat**: wykrywanie każdego modelu w `Workspace.Monsters` posiadającego `MonsterId`, `Monster`, `HP`, `MaxHP`. Nie wymaga nazw przeciwników. Ignoruje sprzedawców, ręce i modele trofeów. `State=Dead` i `HP<=0` wykluczają cel.
-- **Combat Defend / Hunt**: obrona przed bliskimi mobami lub wyszukiwanie w ustawionym zasięgu, slot 1/2/Auto, odstępy ataków, weryfikacja spadku HP i limit błędów. `Monster=Guardian` priorytetowo traktowany jako boss, jeżeli żywy boss używa tego samego schematu.
-- **Graveyard**: filtry Graveyard dla drzew i mobów, status area/event i liczba żywych mobów/bossów w panelu.
-- **UI**: `FARM`, `MOVE`, `COMBAT`, `EVENT`, `CONFIG`, `DEBUG`; draggable, minimizacja, eksport JSON.
-
-## Krótki test
-
-1. Uruchom **Peaceful**, ustaw `Walk` + `Input`, `Auto Collect ON`, `Auto Sell ON`, `Auto Combat OFF`. Zetnij drzewo. Sprawdź, czy plecak wzrasta i czy Sell go opróżnia.
-2. Jeśli nie działa, spróbuj `Step TP` i `pickupDistance` 3–5. Eksportuj JSON, gdy nie potwierdza pickup.
-3. W Event/Night włącz `Auto Combat`, ustaw `Defend` (na początek), `combatTool=2` dla siekiery; następnie możesz użyć `Hunt` + priorytet `Combat`.
-4. `eventOnly` dotyczy drzew z biome `Graveyard` lub typem rozpoczynającym się od `Haunted`. `eventMobs` ogranicza cele do biomu `Graveyard`.
-5. Na koniec kliknij `EXPORT` i w razie problemów wyślij JSON.
-
-## Ograniczenia Alpha
-
-Kod przeszedł lokalny test składni Lua. Nie mamy środowiska Roblox do przeprowadzenia testu działania. Symulowane kliknięcia (`VirtualInputManager`, `mouse1click`) zależą od executora, a ruch/ataki zależą od walidacji serwera. Nie zapewniamy, że w każdej konfiguracji będą działały. Tryb `Experimental Remote` dla drzew pozostał niezweryfikowany i jest **wyłączony domyślnie**. Nie są przechwytywane ani modyfikowane cudze wywołania sieciowe. Podczas testowania combate użyj początkowo `Defend` i pilnuj HP — automat zatrzymuje się przy progu `combatHealth`.
-
-Loggery V6/V7 pozostają poza tym repo jako osobne RAW Lua.
+All cog source files are under 300 lines; no bundler is needed. `main.lua` pulls cog files from your repository. Runtime behavior requires in-game validation.

@@ -66,6 +66,7 @@ return function(C)
     function C:attackTree(tree)
         local p = self:trunk(tree)
         if not p then return false end
+        if self.safetyAlert then return false end
         local hpBefore = tree:GetAttribute("HP") or 0
         local _, root = self:character()
         if not root then return false end
@@ -95,7 +96,7 @@ return function(C)
         end
         self.stats.hits = self.stats.hits + 1
         local deadline = os.clock() + math.max(self.config.attackDelay, 0.55)
-        while self.running and os.clock() < deadline do
+        while self.running and not self.safetyAlert and os.clock() < deadline do
             if (tree:GetAttribute("HP") or hpBefore) < hpBefore - 0.01 then return true end
             if tree:GetAttribute("Felled") == true then return true end
             task.wait(0.09)
