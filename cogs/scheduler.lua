@@ -35,6 +35,15 @@ return function(C)
                 self.eventPending[mob]=nil
             end
         end
+        -- Once the Guardian fight begins, ignore all minions until he dies.
+        if chosenBoss and (chosenBoss:GetAttribute('State')=='Fighting'
+            or self.bossLock==chosenBoss) then
+            self.bossLock=chosenBoss
+            return chosenBoss
+        end
+        if self.bossLock and not self:enemyValid(self.bossLock) then
+            self.bossLock=nil
+        end
         return chosenSkeleton or chosenPumpkin or chosenBoss
     end
     function C:mobInterrupt()
@@ -43,6 +52,7 @@ return function(C)
         return self:pendingEventMob()~=nil
     end
     function C:workStep()
+        if self.reconcileSale then self:reconcileSale() end
         if self:isPaused() then
             self.stage='HP PAUSE: '..math.max(0,math.ceil(self.hpHoldUntil-os.clock()))..'s'
             task.wait(.18); return
@@ -78,6 +88,13 @@ return function(C)
         -- Only explicit MAX in the Clawman Attack Speed card (or lv 6)
         -- switches to TREE RUSH. Never collect/sell in this mode.
         if self.clawSpeedMax and self:clawSpeedMax() then
+            local _,ownsBag,carry=self:equipmentStatus()
+            local bag=self:backpack()
+            if not ownsBag and math.max(carry or 0,bag or 0)>0 then
+                self.stage='RUSH: emptying hands before trees-only mode'
+                if self.cfg.sell then self:sellBag() else task.wait(.15) end
+                return
+            end
             local tree=self:chooseTree()
             if tree then
                 self.stage='TREE RUSH: claws MAX (no pickup/sell)'
@@ -88,48 +105,95 @@ return function(C)
             end
             return
         end
-        -- While levelling, backpack purchase is the ONLY auto purchase.
+        -- Backpack is the only equipment auto-buy. Never visit the station
+        -- while holding loose logs (E could throw them).
         if self.buyBackpackStep and self:buyBackpackStep() then return end
         local bag,cap=self:backpack()
-        if bag==nil then
-            self.stage='WAIT: backpack HUD'; task.wait(.3); return
+        if bag==nil or not cap then
+            self.stage='WAIT: bag HUD';task.wait(.12);return
         end
-        if self.cfg.sell and cap and bag>=cap then
-            if self:sellBag() then
-                self:tryBuyClawsSpeed('sell settled')
-            else task.wait(.25) end
-            return
-        end
+        local _,bagOwned,carried=self:equipmentStatus()
+        local held=math.max(bag,carried or 0)
         local wood,ready=self:woodCounts()
-        if self.cfg.collect and wood>0 then
-            local log=self:chooseWood()
-            if log then self:collectOne(log); return end
-            -- All pending logs are either falling or on per-log retry.
-            -- Harvest the next tree instead of idling for animations.
-            -- Cap pending wood so we do not pile up dozens of logs.
-            local backlogLimit=math.max(9, (cap or 5)*2)
-            if bag<(cap or 5) and wood<backlogLimit then
-                local nextTree=self:chooseTree()
-                if nextTree then
-                    self.stage='TREE: logs settling in background ('..wood..')'
-                    self:chopTree(nextTree)
-                    return
-                end
+        local sale=self.salePending
+        if sale then
+            -- The sell input was sent. Reconcile independently; do not wait
+            -- on the pad or spam a second click while server processes it.
+            if not bagOwned and held>0 then
+                self.stage='SELL: hand carry awaiting confirmation'
+                task.wait(.10);return
             end
-            -- If backlog is full or trees are absent, cash out carried wood.
-            if self.cfg.sell and bag>0 then
-                if self:sellBag() then self:tryBuyClawsSpeed('sell settled') end
+            if bagOwned and held>0 and held>=cap then
+                self.stage='SELL: payout pending; continuing tree chopping'
+                local nextTree=self:chooseTree()
+                if nextTree then self:chopTree(nextTree) else task.wait(.09) end
                 return
             end
-            self.stage='WOOD: waiting/retry ('..wood..', ready '..ready..')'
-            task.wait(.13); return
         end
-        if self.cfg.sell and bag>0 then
-            if self:sellBag() then self:tryBuyClawsSpeed('sell settled') end
-            return
+        if not bagOwned then
+            -- No real backpack: HUD 0/5 (or 0/10) is HAND CARRY.
+            -- Prepare one full load on the ground before clicking any log.
+            -- Once holding even one log, NEVER left-click a tree, because
+            -- LMB then throws the entire carried pile.
+            if held==0 and self.cfg.collect and wood<cap then
+                local tree=self:chooseTree()
+                if tree then
+                    self.stage='HANDS: preparing logs ('..wood..'/'..cap..')'
+                    self:chopTree(tree);return
+                end
+            end
+            if held>0 and held>=cap and self.cfg.sell then
+                self:sellBag();return
+            end
+            if self.cfg.collect and wood>0 then
+                local log=self:chooseWood()
+                if log then self:collectOne(log);return end
+                if held>0 and self.cfg.sell and ready==0 then
+                    self.handLogWaitSince=self.handLogWaitSince or os.clock()
+                    -- Logs can take 2+ seconds to land. Do not sell 8/10
+                    -- just because the last two are briefly falling.
+                    if os.clock()-self.handLogWaitSince>3.0 then
+                        self.handLogWaitSince=nil
+                        self:sellBag();return
+                    end
+                else
+                    self.handLogWaitSince=nil
+                end
+                self.stage='HANDS: waiting for remaining logs'
+                task.wait(.09);return
+            end
+            if held>0 then
+                if self.cfg.sell then self:sellBag() else
+                    self.stage='HANDS: carrying; enable Sell to continue'
+                    task.wait(.12)
+                end
+                return
+            end
+            if wood<cap then
+                local tree=self:chooseTree()
+                if tree then self:chopTree(tree);return end
+            end
+            self.stage='HANDS: waiting for full wood load'
+            task.wait(.09);return
         end
+        -- Owned backpack: normal collect/sell loop, no station dwell.
+        if self.cfg.sell and bag>=cap then
+            self:sellBag();return
+        end
+        if self.cfg.collect and wood>0 then
+            local log=self:chooseWood()
+            if log then self:collectOne(log);return end
+            if bag<cap and wood<math.max(9,cap*2) then
+                local nextTree=self:chooseTree()
+                if nextTree then self:chopTree(nextTree);return end
+            end
+            if self.cfg.sell and bag>0 then self:sellBag();return end
+            self.stage='WOOD: retry ('..wood..', ready '..ready..')'
+            task.wait(.09);return
+        end
+        if self.cfg.sell and bag>0 then self:sellBag();return end
         local tree=self:chooseTree()
-        if tree then self:chopTree(tree); return end
+        if tree then self:chopTree(tree);return end
         local info=self.treeScan or {}
         if wood>0 then
             self.stage='WAIT: wood retry ('..wood..')'
@@ -161,9 +225,13 @@ return function(C)
         self.lastHoldAt=-100; self.skyHoldPosition=nil; self.skyLanding=nil
         self.safeTree=nil; self.safeTreeUntil=0
         self.eventSeen,self.eventPending={},{}
+        self.bossLock=nil
+        self.salePending=nil
+        self.nextSellTry=0
+        self.handLogWaitSince=nil
         local session=self.session
         self.stage='STARTING'
-        self:note('V4.8.0 FARM/MOBS: farm='..tostring(self.cfg.farm)
+        self:note('V4.8.1 FARM/MOBS: farm='..tostring(self.cfg.farm)
             ..', kill='..tostring(self.cfg.combat))
         task.spawn(function() self:watchSafety(session) end)
         task.spawn(function() self:tryBuyClawsSpeed('start balance') end)

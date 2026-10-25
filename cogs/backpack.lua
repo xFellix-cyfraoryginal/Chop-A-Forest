@@ -13,6 +13,9 @@ return function(C)
     function C:buyBackpackStep()
         if not self.cfg.autoBackpack or owned(self) then return false end
         if money(self)<90 or os.clock()<self.nextBackpackTry then return false end
+        local bag=self:backpack()
+        local carried=tonumber(self.player:GetAttribute('CarriedLogs')) or 0
+        if (bag or 0)>0 or carried>0 then return false end
         -- Do not interrupt mob combat to visit the station.
         if self:pendingEventMob() then return false end
         self.nextBackpackTry=os.clock()+14

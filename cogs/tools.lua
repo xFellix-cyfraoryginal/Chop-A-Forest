@@ -27,7 +27,6 @@ return function(C)
         if confirmed then
             self.axeStreak=self.axeStreak+1
             self.axeMisses=0
-            -- Server accepted the swing: gradually test faster timing.
             if self.axeStreak>=2 then
                 self.axeDelay=math.max(.135,self.axeDelay-.017)
             end
@@ -68,7 +67,6 @@ return function(C)
     end
     function C:tap()
         if not self.running or self:isPaused() then return false end
-        -- Prefer viewport-center input over a stale system cursor position.
         if self:mouseDown() then
             task.wait(.055)
             self:releaseMouse()
@@ -162,8 +160,7 @@ return function(C)
             for _,key in ipairs({'AttackCooldown','SwingCooldown','Cooldown','AttackDelay'}) do
                 local num=held:GetAttribute(key)
                 if type(num)=='number' and num>=.08 and num<4 then
-                    -- A faster upgraded weapon must never be clamped to .60.
-                    if profile=='Axe' then
+                            if profile=='Axe' then
                         base=math.min(base,math.clamp(num,.10,3.99))
                     else
                         base=math.clamp(num,.10,3.99)
@@ -178,11 +175,17 @@ return function(C)
         if not self.running or self:isPaused() then return false end
         if purpose=='Combat' and not self.cfg.combat then return false,'Mob killing disabled' end
         if purpose~='Combat' and not self.cfg.farm then return false,'Farm disabled' end
+        if purpose=='Tree' then
+            local _,owned,carry=self:equipmentStatus()
+            local bag=self:backpack()
+            if not owned and math.max(carry or 0,bag or 0)>0 then
+                return false,'Hands full: sell before chopping'
+            end
+        end
         if self.isDodging and self:isDodging() then return false,'Dodging red zone' end
         if purpose~='Combat' and self:mobInterrupt() then
             return false,'Mob spawned; interrupting farm'
         end
-        -- E picks up without weapon swings.
         if purpose=='Pickup' then
             local now=os.clock()
             local nextAt=math.max(self.pickupKeyAt or 0,self.lastInputAt or 0)
@@ -217,8 +220,6 @@ return function(C)
                 profile,held=self:activeProfile()
             end
         end
-        -- Auto never stalls just because the player last equipped an
-        -- unverified Chainsaw/Pistol/Vacuum; return to the proven Axe slot.
         if self.cfg.tool=='Auto' and not self.cfg.useExperimental
             and (profile=='Chainsaw' or profile=='Pistol' or profile=='Vacuum')
             and purpose~='Pickup' then
@@ -296,5 +297,4 @@ return function(C)
         end
         return worked
     end
-
 end

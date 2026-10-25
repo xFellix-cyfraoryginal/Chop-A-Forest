@@ -2,6 +2,11 @@ return function(C)
     function C:chopTree(tree)
         if not self:treeValid(tree) then return false end
         if not self.cfg.farm then return false end
+        local _,owned,carried=self:equipmentStatus()
+        local bag=self:backpack()
+        if not owned and math.max(carried or 0,bag or 0)>0 then
+            return false -- hard guard: LMB with hands occupied drops logs
+        end
         self.workTree = tree
         self.stage = 'TREE: walking'
         local part = self:treePart(tree)
@@ -13,6 +18,9 @@ return function(C)
         while self.running and self.cfg.farm and not self:isPaused() and not self:urgentCombat()
             and not self:mobInterrupt()
             and self:treeValid(tree) and swings < 65 do
+            local _,hasBag,carrying=self:equipmentStatus()
+            local have=self:backpack()
+            if not hasBag and math.max(carrying or 0,have or 0)>0 then break end
             if self.isDodging and self:isDodging() then
                 if self.clearWorkHover then self:clearWorkHover() end
                 return false
@@ -37,7 +45,7 @@ return function(C)
                 self:note(reason or 'No attack input'); failed=failed+1
             end
             if ok then
-                local deadline=os.clock()+1.15
+                local deadline=os.clock()+.79
                 local changed=false
                 while self.running and self.cfg.farm and not self:isPaused() and not self:urgentCombat()
                     and not self:mobInterrupt()
@@ -46,7 +54,7 @@ return function(C)
                     if tree:GetAttribute('Felled')==true or (type(hp)=='number' and hp<previous-.01) then
                         changed=true; break
                     end
-                    task.wait(.07)
+                    task.wait(.035)
                 end
                 local profile=self:activeProfile()
                 if profile=='Axe' and self.learnAxeHit then
@@ -66,7 +74,7 @@ return function(C)
             self.workTree=nil
             self.stats.trees=self.stats.trees+1
             self.stage='WOOD: falling in background'
-            task.wait(.045)
+            -- Start next tree immediately; no idle dwell after tree falls.
             return true
         end
         return false

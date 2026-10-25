@@ -100,7 +100,6 @@ return function(C)
     end
     function C:dodgeTick()
         if not self.live or not self.running or not self.cfg.dodge then return end
-        if self:isPaused() and self.skyHoldPosition then return end
         local now=os.clock()
         prune(now)
         if #self.hazards==0 or now-self.dodgeLastAt<.075 then return end
@@ -128,6 +127,9 @@ return function(C)
         self.motion=self.motion+1 -- invalidate older Walk / TP route
         if self.releaseMouse then self:releaseMouse() end
         local old=root.Position
+        if self.skyHoldPosition and self:isPaused() then
+            self.skyHoldPosition=target -- safety Heartbeat now follows the escape
+        end
         root.CFrame=CFrame.new(target)*root.CFrame.Rotation
         hum:MoveTo(target)
         root.AssemblyLinearVelocity=Vector3.zero

@@ -193,9 +193,20 @@ return function(C)
         if not self:startHover(enemy) then return false end
         local misses,shots=0,0
         local lastHP=enemy:GetAttribute('HP')
-        local deadline=os.clock()+(self.cfg.move=='Walk' and 48 or 24)
+        local boss=enemy:GetAttribute('Monster')=='Guardian'
+        if boss then self.bossLock=enemy end
+        local deadline=os.clock()+(self.cfg.move=='Walk' and 55 or 42)
         while self.running and self.cfg.combat and not self:isPaused() and self:enemyValid(enemy)
-            and shots<40 and os.clock()<deadline do
+            and shots<(boss and 130 or 40) and os.clock()<deadline do
+            if not boss then
+                local guardian=self:pickBoss()
+                if guardian and (guardian:GetAttribute('State')=='Fighting'
+                    or self.bossLock==guardian) then
+                    self.bossLock=guardian
+                    self:note('BOSS ACTIVE: dropping minion target')
+                    break
+                end
+            end
             if self.cfg.priority=='FARM' and not self:urgentCombat() then break end
             if self.isDodging and self:isDodging() then
                 task.wait(.05)
@@ -222,7 +233,7 @@ return function(C)
             if not ok then self:note(why or 'Combat input failed'); break end
             shots=shots+1
             local confirmed=false
-            local untilAt=os.clock()+.65
+            local untilAt=os.clock()+(boss and .45 or .55)
             while self.running and self.cfg.combat and not self:isPaused() and os.clock()<untilAt do
                 local after=enemy:GetAttribute('HP')
                 if type(before)=='number' and type(after)=='number' and after<before-.01 then
@@ -239,8 +250,8 @@ return function(C)
                 -- Try a closer vertical offset after misses; target keeps moving.
                 self.followHeight=misses%2==0 and 2.8 or 3.3
                 if misses>=5 then
-                    self:note('No confirmed damage; retry target later')
-                    break
+                    self:note('No confirmed damage; adjusting target')
+                    if not boss or misses>=9 then break end
                 end
             end
             end -- walk range gate
@@ -252,11 +263,12 @@ return function(C)
         local dead=(type(finalHP)=='number' and finalHP<=0)
             or enemy:GetAttribute('State')=='Dead'
         if dead then
+            if boss then self.bossLock=nil end
             self.stats.kills=self.stats.kills+1
             self:note('Monster defeated (HP confirmed)')
             return true
         end
-        self.enemyRetry[enemy]=os.clock()+math.min(7,2+misses)
+        self.enemyRetry[enemy]=os.clock()+(boss and .35 or math.min(7,2+misses))
         return false
     end
 end
