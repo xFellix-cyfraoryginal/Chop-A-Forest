@@ -78,7 +78,6 @@ return function(C)
         if self.cfg.sell and bag>0 then
             self:sellBag(); return
         end
-        if not setup and self.cfg.autoUpgrade and self:upgradeStep() then return end
         local tree=self:chooseTree()
         if tree then self:chopTree(tree); return end
         local info=self.treeScan or {}
@@ -117,7 +116,7 @@ return function(C)
         self.safeTree=nil; self.safeTreeUntil=0
         local session=self.session
         self.stage='STARTING'
-        self:note('V4.7 STARTER AUTO BUY '..self.cfg.priority..' / '..self.cfg.move)
+        self:note('V4.7.1 AUTO BUY NO UPGRADES '..self.cfg.priority..' / '..self.cfg.move)
         task.spawn(function() self:watchSafety(session) end)
         task.spawn(function() self:workLoop(session) end)
     end

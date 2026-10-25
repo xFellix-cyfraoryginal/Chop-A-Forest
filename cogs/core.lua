@@ -22,7 +22,7 @@ return function(C)
         pickupRange = 3.7, treeRange = 3.7,
         maxTreeDistance = math.huge, idlePause = .15,
         useExperimental = false, autoBuy = true,
-        autoUpgrade = true, autoEndless = true
+        autoEndless = true
     }
     C.toolAt, C.toolSlot = {}, ''
     function C:connect(signal, callback)
