@@ -16,7 +16,8 @@ return function(C)
     end
     function C:goTo(goal, radius, escape)
         if not goal or not self.running then return false end
-        if self.panic and not escape then return false end
+        if (self:isPaused() or (self:urgentCombat() and not self.stage:find('COMBAT',1,true)))
+            and not escape then return false end
         local _, root, hum = self:character()
         if not root then return false end
         self.motion = self.motion + 1
@@ -24,7 +25,8 @@ return function(C)
         local function valid()
             return self.live and self.running and token == self.motion
                 and session == self.session and hum.Health > 0
-                and (escape or not self.panic)
+                and (escape or (not self:isPaused()
+                    and (not self:urgentCombat() or self.stage:find('COMBAT',1,true))))
         end
         radius = radius or 3.5
         local dest = self:ground(goal)
@@ -34,16 +36,7 @@ return function(C)
             root.CFrame = CFrame.new(dest) * root.CFrame.Rotation
             task.wait(.23)
             return valid() and (root.Position-dest).Magnitude <= radius + 2
-        elseif self.cfg.move == 'Step TP' and not escape then
-            local from = root.Position
-            local steps = math.clamp(math.ceil((dest-from).Magnitude/3.5),1,180)
-            for i=1,steps do
-                if not valid() then return false end
-                local p = from:Lerp(dest,i/steps)
-                root.CFrame = CFrame.new(p) * root.CFrame.Rotation
-                task.wait(.08)
-            end
-            return valid() and (root.Position-dest).Magnitude <= radius + 2
+
         end
         local function walk(point, close)
             hum:MoveTo(point)
@@ -61,36 +54,6 @@ return function(C)
         end
         local distance = (root.Position-dest).Magnitude
         if distance > 15 then
-            -- A local detour avoids straight-line movement through hostile mobs.
-            local detour
-            if not escape then
-                local a = root.Position
-                local flat = Vector3.new(dest.X-a.X,0,dest.Z-a.Z)
-                if flat.Magnitude > 9 then
-                    local dir=flat.Unit
-                    local side=Vector3.new(-dir.Z,0,dir.X)
-                    for mob in pairs(self.enemies) do
-                        if self:enemyValid(mob) then
-                            local at=self:enemyPosition(mob)
-                            if at then
-                                local offset=Vector3.new(at.X-a.X,0,at.Z-a.Z)
-                                local along=offset:Dot(dir)
-                                local edge=math.abs(offset:Dot(side))
-                                if along>2 and along<flat.Magnitude and edge<8 then
-                                    local left=at+side*15
-                                    local right=at-side*15
-                                    local ln=self:threats(left,9)
-                                    local rn=self:threats(right,9)
-                                    detour=ln<rn and left or right
-                                    break
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-            if detour and valid() then walk(self:ground(detour),3.5) end
-            if not valid() then return false end
             local path
             local ok = pcall(function()
                 path = self.pfs:CreatePath({AgentRadius=2,AgentHeight=5,AgentCanJump=true})

@@ -8,7 +8,8 @@ return function(C)
         if not self:goTo(part.Position, self.cfg.treeRange) then return false end
         self.stage = 'TREE: chopping'
         local failed, swings = 0, 0
-        while self.running and not self.panic and self:treeValid(tree) and swings < 65 do
+        while self.running and not self:isPaused() and not self:urgentCombat()
+            and self:treeValid(tree) and swings < 65 do
             part=self:treePart(tree)
             if not part then break end
             local pos=self:position()
@@ -22,7 +23,8 @@ return function(C)
             if ok then
                 local deadline=os.clock()+1.15
                 local changed=false
-                while self.running and not self.panic and os.clock()<deadline do
+                while self.running and not self:isPaused() and not self:urgentCombat()
+                    and os.clock()<deadline do
                     local hp=tree:GetAttribute('HP')
                     if tree:GetAttribute('Felled')==true or (type(hp)=='number' and hp<previous-.01) then
                         changed=true; break

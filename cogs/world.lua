@@ -78,7 +78,7 @@ return function(C)
         for log, job in pairs(self.wood) do
             if not job.done and now >= job.nextTry and self:woodReady(log, job) then
                 local pos = self:woodPosition(log)
-                if pos and not self:isRiskPos(pos) then
+                if pos then
                     local d = (pos-playerPos).Magnitude
                     if d < dist then selected, dist = log, d end
                 end
@@ -89,7 +89,7 @@ return function(C)
     function C:chooseTree()
         if self.workTree and self:treeValid(self.workTree) then
             local part = self:treePart(self.workTree)
-            if part and not self:isRiskPos(part.Position) then return self.workTree end
+            if part then return self.workTree end
         end
         local playerPos = self:position()
         if not playerPos then return nil end
@@ -98,7 +98,7 @@ return function(C)
         for tree in pairs(self.trees) do
             if self:treeValid(tree) and (self.blockedTrees[tree] or 0) < now then
                 local part = self:treePart(tree)
-                if part and not self:isRiskPos(part.Position) then
+                if part then
                     local d = (part.Position-playerPos).Magnitude
                     if d < self.cfg.maxTreeDistance then
                         local golden = tree:GetAttribute('Mutation') == 'Golden'

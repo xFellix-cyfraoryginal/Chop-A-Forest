@@ -1,76 +1,60 @@
+-- MonsterId-based targeting. No crowd-size bailouts or automatic kite dance.
 return function(C)
     C.enemyRetry={}
-    function C:pickEnemy()
-        if not self.cfg.combat or self.cfg.style=='Safe' then return nil end
-        local playerPos=self:position()
-        if not playerPos then return nil end
-        local selected, nearest=nil,math.huge
-        local maxRange=self.cfg.style=='Aggressive' and 45 or 10
-        for enemy in pairs(self.enemies) do
-            if self:enemyValid(enemy) and os.clock() >= (self.enemyRetry[enemy] or 0)
-                and enemy:GetAttribute('Monster')~='Guardian' then
-                local point=self:enemyPosition(enemy)
-                if point then
-                    local d=(point-playerPos).Magnitude
-                    if d<maxRange and d<nearest then
-                        selected,nearest=enemy,d
-                    end
+    function C:pickEnemy(radius)
+        if not self.cfg.combat then return nil end
+        local point=self:position()
+        if not point then return nil end
+        local chosen,best=nil,math.huge
+        radius=radius or self.cfg.combatRadius
+        for mob in pairs(self.enemies) do
+            if self:enemyValid(mob) and mob:GetAttribute('Monster')~='Guardian'
+                and os.clock()>=(self.enemyRetry[mob] or 0) then
+                local at=self:enemyPosition(mob)
+                if at then
+                    local d=(at-point).Magnitude
+                    if d<radius and d<best then chosen,best=mob,d end
                 end
             end
         end
-        return selected
+        return chosen
     end
     function C:fight(enemy)
-        if not self:enemyValid(enemy) then return false end
-        local hp,maxHP=self:health()
-        if hp/math.max(maxHP,1)<.78 then return false end
-        self.stage='COMBAT: engage'
-        local failed,attempts=0,0
-        while self.running and not self.panic and self:enemyValid(enemy) and attempts<30 do
+        if not self:enemyValid(enemy) or self:isPaused() then return false end
+        self.stage='COMBAT: target'
+        local misses,shots=0,0
+        local deadline=os.clock()+20
+        while self.running and not self:isPaused() and self:enemyValid(enemy)
+            and shots<35 and os.clock()<deadline do
+            -- FARM only defends against nearby enemies for a brief time after damage.
+            if self.cfg.priority=='FARM' and not self:urgentCombat() then break end
             local at=self:enemyPosition(enemy)
             local p=self:position()
             if not at or not p then break end
-            local crowd=self:threats(p,7)
-            if crowd>1 then break end -- no multi-mob suicide
-            local hpCurrent,hpMax=self:health()
-            if hpCurrent/math.max(hpMax,1)<.73 then break end
             local profile=self:activeProfile()
-            local reach=profile=='Pistol' and 14 or 4.3
+            local reach=profile=='Pistol' and 13 or 4.1
             if (at-p).Magnitude>reach then
-                self.stage='COMBAT: approach'
-                if not self:goTo(at,reach-1) then break end
+                self.stage='COMBAT: approaching'
+                if not self:goTo(at,reach-0.6) then break end
             end
-            local previous=enemy:GetAttribute('HP')
-            local ok,reason=self:useItem(at+Vector3.new(0,1.25,0),'Combat')
-            if not ok then self:note(reason or 'Combat input failed'); break end
-            attempts=attempts+1
-            local changed=false
-            local deadline=os.clock()+.85
-            while self.running and not self.panic and os.clock()<deadline do
-                local now=enemy:GetAttribute('HP')
-                if type(now)=='number' and now<previous-.01 then
-                    changed=true; break
+            self.stage='COMBAT: attacking'
+            local before=enemy:GetAttribute('HP')
+            local ok,why=self:useItem(at+Vector3.new(0,1.2,0),'Combat')
+            if not ok then self:note(why or 'Combat input failed'); break end
+            shots=shots+1
+            local confirmed=false
+            local untilAt=os.clock()+.9
+            while self.running and not self:isPaused() and os.clock()<untilAt do
+                local after=enemy:GetAttribute('HP')
+                if not self:enemyValid(enemy) or
+                    (type(before)=='number' and type(after)=='number' and after<before-.01) then
+                    confirmed=true; break
                 end
-                if not self:enemyValid(enemy) then changed=true; break end
-                task.wait(.07)
+                task.wait(.06)
             end
-            if changed then failed=0 else failed=failed+1 end
-            if failed>=3 then
-                self:note('Enemy damage not confirmed; skipping target')
-                break
-            end
-            -- Light sidestep helps against melee without risky large circles.
-            if self.running and not self.panic and self:enemyValid(enemy)
-                and self.cfg.move=='Walk' then
-                local me=self:position()
-                local target=self:enemyPosition(enemy)
-                if me and target and (me-target).Magnitude<6 then
-                    local offset=me-target
-                    local side=Vector3.new(-offset.Z,0,offset.X)
-                    if side.Magnitude>0.1 then
-                        self:goTo(me+side.Unit*3,2.3)
-                    end
-                end
+            misses=confirmed and 0 or misses+1
+            if misses>=3 then
+                self:note('Combat no damage: temporary target cooldown'); break
             end
         end
         if not self:enemyValid(enemy) then
@@ -78,7 +62,7 @@ return function(C)
             self:note('Monster defeated')
             return true
         end
-        self.enemyRetry[enemy]=os.clock()+12
+        self.enemyRetry[enemy]=os.clock()+9
         return false
     end
 end

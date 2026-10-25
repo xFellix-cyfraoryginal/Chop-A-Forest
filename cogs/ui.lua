@@ -21,7 +21,7 @@ return function(C)
         local ok,custom=pcall(gethui)
         if ok and custom then parent=custom end
     end
-    local gui=make('ScreenGui',{Name='CAF_CoreRewrite_V4',ResetOnSpawn=false,
+    local gui=make('ScreenGui',{Name='CAF_ActionFirst_V4_1',ResetOnSpawn=false,
         IgnoreGuiInset=true,ZIndexBehavior=Enum.ZIndexBehavior.Sibling},parent)
     C.gui=gui
     local panel=round(make('Frame',{Size=UDim2.fromOffset(394,382),
@@ -30,7 +30,7 @@ return function(C)
     local top=round(make('Frame',{Size=UDim2.new(1,0,0,48),
         BackgroundColor3=surface,BorderSizePixel=0},panel),12)
     make('TextLabel',{Size=UDim2.new(1,-92,1,0),Position=UDim2.fromOffset(13,0),
-        BackgroundTransparency=1,Text='CHOP A FOREST  /  CORE V4',TextSize=14,
+        BackgroundTransparency=1,Text='CHOP A FOREST  /  ACTION FIRST V4.1',TextSize=14,
         Font=Enum.Font.GothamBold,TextColor3=ink,TextXAlignment=Enum.TextXAlignment.Left},top)
     local function button(parent,text,y,height,color,clicked)
         local b=round(make('TextButton',{Size=UDim2.new(1,-20,0,height or 37),
@@ -90,19 +90,18 @@ return function(C)
     local runButton=button(main,'START',96,43,green,function()
         if C.running then C:stop() else C:start() end
     end)
-    local moveBtn=button(main,'Movement: Walk',148,35,surface,function() end)
+    local moveBtn=button(main,'Movement: Instant TP',148,35,surface,function() end)
     C:connect(moveBtn.MouseButton1Click,function()
-        local options={'Walk','Step TP','Instant TP'}
+        local options={'Walk','Instant TP'}
         local index=table.find(options,C.cfg.move) or 1
         C.cfg.move=options[index%#options+1]
         moveBtn.Text='Movement: '..C.cfg.move
     end)
-    local styleBtn=button(main,'Playstyle: Balanced',190,35,surface,function() end)
-    C:connect(styleBtn.MouseButton1Click,function()
-        local options={'Safe','Balanced','Aggressive'}
-        local index=table.find(options,C.cfg.style) or 1
-        C.cfg.style=options[index%#options+1]
-        styleBtn.Text='Playstyle: '..C.cfg.style
+    local priorityBtn=button(main,'Priority: FARM FIRST',190,35,surface,function() end)
+    C:connect(priorityBtn.MouseButton1Click,function()
+        C.cfg.priority=C.cfg.priority=='FARM' and 'ATTACK' or 'FARM'
+        priorityBtn.Text='Priority: '..C.cfg.priority..' FIRST'
+        C:note('Priority changed: '..C.cfg.priority..' FIRST')
     end)
     label(main,'F8  |  EMERGENCY STOP',237,12)
     local tools=pages.TOOLS
@@ -124,8 +123,21 @@ return function(C)
         C.cfg.useExperimental=not C.cfg.useExperimental
         exp.Text='Unverified tools: '..(C.cfg.useExperimental and 'ON' or 'OFF')
     end)
-    label(tools,'Axe/Fists verified by logs. Other tools = beta.',190,12)
-    label(tools,'F8 stops; queued wood remains for next START.',218,12)
+    local holdBtn=button(tools,'HP Pause: ON (6s at <=40%)',187,34,surface,function() end)
+    C:connect(holdBtn.MouseButton1Click,function()
+        C.cfg.hpPause=not C.cfg.hpPause
+        holdBtn.Text='HP Pause: '..(C.cfg.hpPause and 'ON' or 'OFF')
+            ..' ('..C.cfg.pauseSeconds..'s at <=40%)'
+    end)
+    local durationBtn=button(tools,'Pause duration: 6 seconds',227,34,surface,function() end)
+    C:connect(durationBtn.MouseButton1Click,function()
+        local values={4,6,8,10}
+        local i=table.find(values,C.cfg.pauseSeconds) or 2
+        C.cfg.pauseSeconds=values[i%#values+1]
+        durationBtn.Text='Pause duration: '..C.cfg.pauseSeconds..' seconds'
+        holdBtn.Text='HP Pause: '..(C.cfg.hpPause and 'ON' or 'OFF')
+            ..' ('..C.cfg.pauseSeconds..'s at <=40%)'
+    end)
     local debug=pages.DEBUG
     local debugInfo=label(debug,'Waiting for actions...',6,12)
     local expBtn=button(debug,'EXPORT DIAGNOSTICS',49,39,blue,function()

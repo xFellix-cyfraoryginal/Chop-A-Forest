@@ -15,12 +15,13 @@ return function(C)
     C.connections, C.messages = {}, {}
     C.stats = {trees = 0, collected = 0, sold = 0, kills = 0, retreats = 0}
     C.cfg = {
-        move = 'Walk', style = 'Balanced', tool = 'Auto',
+        move = 'Instant TP', priority = 'FARM', tool = 'Auto',
         combat = true, collect = true, sell = true,
-        minHP = 0.58, resumeHP = 0.84,
+        hpPause = true, pauseHP = 0.40, pauseSeconds = 6,
+        retaliateSeconds = 9, clearUntil = 1, combatRadius = 65,
         pickupRange = 3.7, treeRange = 3.7,
         maxTreeDistance = 260, idlePause = .27,
-        useExperimental = false, emergencyTP = false
+        useExperimental = false
     }
     C.toolAt, C.toolSlot = {}, ''
     function C:connect(signal, callback)

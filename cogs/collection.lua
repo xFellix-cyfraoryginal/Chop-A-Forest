@@ -2,7 +2,7 @@ return function(C)
     function C:collectOne(log)
         local job=self.wood[log]
         if not job or job.done or not self:woodReady(log,job) then return false end
-        if self.panic then return false end
+        if self:isPaused() or self:urgentCombat() then return false end
         local have,cap=self:backpack()
         if not have or not cap or have>=cap then return false end
         local at=self:woodPosition(log)
@@ -12,11 +12,11 @@ return function(C)
             job.nextTry=os.clock()+2.5
             return false
         end
-        if self.panic or log.Parent~=self.logsFolder then return false end
+        if self:isPaused() or self:urgentCombat() or log.Parent~=self.logsFolder then return false end
         self.stage='WOOD: collecting'
         local success=false
         for attempt=1,2 do
-            if not self.running or self.panic or job.done then break end
+            if not self.running or self:isPaused() or self:urgentCombat() or job.done then break end
             local before=self:backpack()
             if not before or before>=cap then break end
             local updatedAt=self:woodPosition(log)
@@ -27,7 +27,7 @@ return function(C)
                 break
             end
             local deadline=os.clock()+.75
-            while self.running and not self.panic and os.clock()<deadline do
+            while self.running and not self:isPaused() and not self:urgentCombat() and os.clock()<deadline do
                 local after=self:backpack()
                 if after and after>before then success=true; break end
                 if log.Parent~=self.logsFolder then break end
@@ -70,7 +70,7 @@ return function(C)
         if not self:goTo(point,3.3) then return false end
         self.stage='SELL: depositing'
         local deadline=os.clock()+2.5
-        while self.running and not self.panic and os.clock()<deadline do
+        while self.running and not self:isPaused() and not self:urgentCombat() and os.clock()<deadline do
             local after=self:backpack()
             if after and after<before then
                 self.stats.sold=self.stats.sold+(before-after)
@@ -82,7 +82,7 @@ return function(C)
         local ok=self:useItem(point,'Pickup')
         if ok then
             local endAt=os.clock()+1.2
-            while self.running and not self.panic and os.clock()<endAt do
+            while self.running and not self:isPaused() and not self:urgentCombat() and os.clock()<endAt do
                 local after=self:backpack()
                 if after and after<before then
                     self.stats.sold=self.stats.sold+(before-after)

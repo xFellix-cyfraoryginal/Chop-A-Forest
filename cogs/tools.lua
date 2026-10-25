@@ -31,7 +31,7 @@ return function(C)
         return false
     end
     function C:tap()
-        if not self.running or self.panic then return false end
+        if not self.running or self:isPaused() then return false end
         -- Prefer viewport-center input over a stale system cursor position.
         if self:mouseDown() then
             task.wait(.055)
@@ -48,10 +48,10 @@ return function(C)
         return false
     end
     function C:hold(duration)
-        if not self.running or self.panic then return false end
+        if not self.running or self:isPaused() then return false end
         if not self:mouseDown() then return false end
         local deadline = os.clock() + duration
-        while self.running and not self.panic and os.clock() < deadline do task.wait(.06) end
+        while self.running and not self:isPaused() and os.clock() < deadline do task.wait(.06) end
         self:releaseMouse()
         return true
     end
@@ -110,7 +110,10 @@ return function(C)
         return base
     end
     function C:useItem(target, purpose)
-        if not self.running or self.panic then return false end
+        if not self.running or self:isPaused() then return false end
+        if purpose~='Combat' and self:urgentCombat() then
+            return false,'Retaliating against mob'
+        end
         local profile, held = self:activeProfile()
         -- In Auto, prefer the verified Axe for tree work, pickup and melee.
         if self.cfg.tool=='Auto' then
@@ -152,10 +155,10 @@ return function(C)
         local key=profile
         local now=os.clock()
         local waitUntil=math.max(self.toolAt[key] or 0,self.lastInputAt or 0)
-        while self.running and not self.panic and now<waitUntil do
+        while self.running and not self:isPaused() and now<waitUntil do
             task.wait(math.min(.08,waitUntil-now)); now=os.clock()
         end
-        if not self.running or self.panic then return false end
+        if not self.running or self:isPaused() then return false end
         local worked
         if profile=='Chainsaw' or (profile=='Vacuum' and purpose=='Pickup') then
             worked=self:hold(.40)
