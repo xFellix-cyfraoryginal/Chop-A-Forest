@@ -71,13 +71,17 @@ return function(C)
         self:note('Pickup failed; wood remains in queue')
         return false
     end
+    -- Sell is not complete just because the HUD briefly displays 0/5.
+    -- Stay on the actual pad long enough for delayed server settlement.
+    local function readCash(self)
+        local stats=self.player:FindFirstChild('leaderstats')
+        local cash=stats and stats:FindFirstChild('Cash')
+        return cash and type(cash.Value)=='number' and cash.Value or nil
+    end
     function C:sellBag()
-        local before,cap=self:backpack()
+        local before=self:backpack()
         if not before or before<1 then return false end
-        if not self.sellSpot then
-            self:note('SellSpot missing'); return false
-        end
-        self.stage='SELL: approaching'
+        if not self.sellSpot then self:note('SellSpot missing'); return false end
         local pad=self.sellSpot:FindFirstChild('DepositPad',true)
         local point=pad and pad:IsA('BasePart') and pad.Position
         if not point then
@@ -85,33 +89,89 @@ return function(C)
             if ok then point=p end
         end
         if not point then return false end
-        if not self:goTo(point,3.3) then return false end
-        self.stage='SELL: depositing'
-        local deadline=os.clock()+2.5
+        self.stage='SELL: center of pad'
+        if not self:goTo(point,.65) then return false end
+        local started=os.clock()
+        local deadline=started+13.5
+        local firstZero,lowest=nil,before
+        local clickTried=false
+        local cashStart=readCash(self)
+        local lastCash,lastCashAt=cashStart,started
+        local lastRecenter=started
+        -- Keep a small audit to diagnose apparent log duplication / HUD rollbacks.
+        local function audit(status,endingBag,endingCash)
+            self.sellAudit=self.sellAudit or {}
+            local entries=self.sellAudit
+            entries[#entries+1]={status=status,bagBefore=before,bagAfter=endingBag,
+                cashBefore=cashStart,cashAfter=endingCash,
+                seconds=math.floor((os.clock()-started)*10+.5)/10}
+            if #entries>20 then table.remove(entries,1) end
+        end
+        self.stage='SELL: waiting for server'
         while self.running and not self:isPaused() and not self:urgentCombat()
             and os.clock()<deadline do
+            local now=os.clock()
             local after=self:backpack()
-            if after and after<before then
-                self.stats.sold=self.stats.sold+(before-after)
-                self:note('Sold '..(before-after)..' logs')
+            if after then
+                lowest=math.min(lowest,after)
+                if after==0 then
+                    firstZero=firstZero or now
+                else
+                    -- A transient 0 is NOT a completed sale.
+                    firstZero=nil
+                end
+            end
+            local cash=readCash(self)
+            if cash and lastCash and cash~=lastCash then
+                lastCashAt=now
+                lastCash=cash
+            end
+            -- Some servers require a click on the pad; try it once only
+            -- if standing there did not change the inventory at all.
+            if not clickTried and now-started>=2.1 and lowest>=before then
+                clickTried=true
+                self.stage='SELL: activating pad'
+                self:useItem(point,'Deposit')
+                self.stage='SELL: waiting for server'
+            end
+            -- On physics corrections, return to the center. Do not walk out
+            -- of the deposit region while the bag is being settled.
+            if now-lastRecenter>=.35 then
+                lastRecenter=now
+                local _,root=self:character()
+                if root then
+                    local horizontal=(Vector3.new(root.Position.X,0,root.Position.Z)
+                        -Vector3.new(point.X,0,point.Z)).Magnitude
+                    if horizontal>2.0 then
+                        self.stage='SELL: holding deposit pad'
+                        self:goTo(point,.65)
+                        self.stage='SELL: waiting for server'
+                    end
+                end
+            end
+            if after==0 and firstZero and now-started>=9.0
+                and now-firstZero>=3.5 and now-lastCashAt>=1.2 then
+                audit('bag_stable',after,cash)
+                self.stats.sold=self.stats.sold+before
+                if cashStart and cash and cash<=cashStart then
+                    self:note('Bag stable 0; cash payout not yet verified')
+                else
+                    self:note('Sell stabilized: '..before..' logs')
+                end
                 return true
             end
-            task.wait(.09)
+            task.wait(.12)
         end
-        -- A regular click is the last fallback; E is reserved for LOG pickup.
-        local ok=self:useItem(point,'Deposit')
-        if ok then
-            local untilAt=os.clock()+1.1
-            while self.running and not self:isPaused() and os.clock()<untilAt do
-                local after=self:backpack()
-                if after and after<before then
-                    self.stats.sold=self.stats.sold+(before-after)
-                    return true
-                end
-                task.wait(.08)
-            end
+        local after=self:backpack()
+        if after==0 and firstZero and os.clock()-firstZero>=3.5 then
+            audit('bag_stable_timeout',after,readCash(self))
+            self.stats.sold=self.stats.sold+before
+            self:note('Bag still 0 after sell dwell; cash may settle later')
+            return true
         end
-        self:note('Sell not confirmed (retry later)')
+        audit(self.running and 'not_settled' or 'interrupted',after,readCash(self))
+        self:note('Sell NOT settled: '..tostring(after)..'/'..tostring(before)
+            ..' (will retry; no forced inventory reset)')
         return false
     end
 end

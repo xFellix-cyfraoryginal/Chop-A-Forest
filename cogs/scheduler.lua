@@ -1,4 +1,4 @@
--- V4.2: ATTACK sweeps all replicated monsters; FARM sweeps all trees.
+-- V4.4: pending wood is harvested in a pipeline; sale dwell is synchronized.
 return function(C)
     function C:workStep()
         if self:isPaused() then
@@ -39,22 +39,27 @@ return function(C)
         if self.cfg.collect and wood>0 then
             local log=self:chooseWood()
             if log then self:collectOne(log); return end
-            if ready==0 then
-                local young=false
-                for log,job in pairs(self.wood) do
-                    if log.Parent==self.logsFolder and not job.done
-                        and os.clock()-job.born<8 then young=true; break end
-                end
-                if young then
-                    self.stage='WOOD: waiting for fall ('..wood..')'
-                    task.wait(.30); return
+            -- All pending logs are either falling or on per-log retry.
+            -- Harvest the next tree instead of idling for animations.
+            -- Cap pending wood so we do not pile up dozens of logs.
+            local backlogLimit=math.max(9, (cap or 5)*2)
+            if bag<(cap or 5) and wood<backlogLimit then
+                local nextTree=self:chooseTree()
+                if nextTree then
+                    self.stage='TREE: logs settling in background ('..wood..')'
+                    self:chopTree(nextTree)
+                    return
                 end
             end
+            -- If backlog is full or trees are absent, cash out carried wood.
+            if self.cfg.sell and bag>0 then
+                self:sellBag(); return
+            end
+            self.stage='WOOD: waiting/retry ('..wood..', ready '..ready..')'
+            task.wait(.13); return
         end
-        -- Depositing a partial backpack does not require every log to be reachable.
         if self.cfg.sell and bag>0 then
-            if not self:sellBag() then task.wait(.25) end
-            return
+            self:sellBag(); return
         end
         local tree=self:chooseTree()
         if tree then self:chopTree(tree); return end
@@ -75,7 +80,7 @@ return function(C)
                 self:note('ERROR: '..tostring(err))
                 self:stop(); break
             end
-            task.wait(self.cfg.idlePause)
+            task.wait(math.min(self.cfg.idlePause or .15, .045))
         end
     end
     function C:start()
@@ -90,7 +95,7 @@ return function(C)
         self.safeTree=nil; self.safeTreeUntil=0
         local session=self.session
         self.stage='STARTING'
-        self:note('V4.3 SAFE RETREAT '..self.cfg.priority..' FIRST / '..self.cfg.move)
+        self:note('V4.4 PIPELINE '..self.cfg.priority..' FIRST / '..self.cfg.move)
         task.spawn(function() self:watchSafety(session) end)
         task.spawn(function() self:workLoop(session) end)
     end

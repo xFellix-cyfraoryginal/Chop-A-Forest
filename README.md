@@ -1,34 +1,24 @@
-# Chop-A-Forest V4.1 — Action First
+# Chop-A-Forest V4.4 — Sell Sync & Pipeline (PATCH ONLY)
 
-**Luau only** — `main.lua` + `cogs/`, each cog under 300 lines. No Python, no logger.
+Base: **V4.3** (includes V4.2 and V4.1). Replace just the six files included in this ZIP; keep all other cogs.
 
-Repository target: `https://github.com/xFellix-cyfraoryginal/Chop-A-Forest` (`main`).
+Files: `main.lua`, `cogs/collection.lua`, `cogs/scheduler.lua`, `cogs/navigation.lua`, `cogs/trees.lua`, `cogs/ui.lua`.
 
-## Install
+## Changes
 
-Replace **both** `main.lua` and all files in `cogs/` with this archive; commit to GitHub.
-Run from the game executor:
+- **Sell Sync:** move to deposit pad CENTER, wait at least ~9 seconds, confirm `0/5` has stayed stable >=3.5 seconds; watch for delayed Cash changes. Retry one click ONLY if standing on pad did not change the inventory. Detect an inventory rebound and do not claim success from a transient zero. Hard deadline ~13.5s to avoid infinite stalls. No client-side inventory edits. DEBUG export includes the last 20 sale audits (bag and Cash before/after, duration).
+- **Pipeline:** once a tree falls, its log models enter the existing persistent registry. When logs are still animating/not ready (or waiting retry), chop another tree instead of waiting, as long as pending logs are below max(9, 2*backpack capacity). Pick up ready wood before selecting new trees. If backlog is at limit, stop producing wood and wait or sell.
+- **Instant TP:** reduces a fixed 230ms artificial delay to ~45ms, with one corrective retry if Roblox does not keep the expected position. No Step TP.
+- **F8 STOP**, ATTACK/FARM priorities and HP safety remain from V4.3.
+
+## How to install
+
+Replace the six files in your GitHub repo with the files from this archive (respect `cogs/` paths); Commit changes. No need to delete any other cogs.
 
 ```lua
-loadstring(game:HttpGet('https://raw.githubusercontent.com/xFellix-cyfraoryginal/Chop-A-Forest/main/main.lua?v=4.1.0'))()
+loadstring(game:HttpGet('https://raw.githubusercontent.com/xFellix-cyfraoryginal/Chop-A-Forest/main/main.lua?v=4.4.0'))()
 ```
 
-The UI heading is `ACTION FIRST V4.1`; if it still says `V4.0`, replace GitHub files.
+The UI header should say `PIPELINE V4.4`.
 
-## Core behavior
-
-- **Priority FARM FIRST** (default): chop trees, wait for settled logs, pick them up, sell. Nearby monsters do not block target selection. **Taking actual damage** enables temporary retaliation against a nearby mob, after which work resumes. The same response works for the last remaining mob in ATTACK mode.
-- **Priority ATTACK FIRST**: kill nearby detected `MonsterId` enemies until **at most one** is within 65 studs, then farm. Bosses (`Monster=Guardian`) are excluded. Attack attempts are verified against actual mob HP and temporarily cooled down after repeated misses.
-- **Movement Instant TP** (default) teleports once to the desired target. **Walk** remains optional. Both are available in MAIN; Step TP was removed.
-- **HP Pause** (TOOLS): defaults to six seconds when damage drops health to **40% or below**. The HP pause is deferred if an enemy is within 11 studs, preventing a frozen character from standing still while under attack. No automatic running to a safe zone, no `safe tree` or `safe wood` restrictions. The pause is retriggered only by subsequent damage after its cooldown.
-- **F8** instantly stops the farm. Press START to resume; queued logs survive STOP during the same session.
-- Item input and pickup must produce visible server-side state changes (tree/mob HP or backpack count). Log queue is not cleared by a failed pickup.
-
-## Caveats
-
-- This is **unverified inside live Roblox**. Syntax and loader checks do not establish effective damage/pickup, server-accepted teleportation or safety.
-- A server can reject or revert instant teleportation.
-- FARM FIRST intentionally prioritizes harvesting over avoiding monsters; it can get the character killed. F8 is available for immediate STOP.
-- The short HP Pause has no guaranteed healing: if the game does not regenerate health, it resumes after the chosen duration rather than staying stuck forever.
-- `Axe`/`Fists` have observed interactions in recorded logs; `Chainsaw`, `Vacuum` and `Pistol` still have experimental controls only.
-- ATTACK FIRST is not endless combat: once the nearby monster count reaches one, harvesting resumes. New spawns may trigger another clear cycle.
+**Limitation:** we cannot prove a server-side sell just from a client HUD. The wait and cash check reduce the race condition but do not guarantee a server transaction; if the game/server itself duplicates inventory, the client script cannot reliably fix it. Test with a small bag and inspect the cash value. The game may reject/correct fast teleportation.

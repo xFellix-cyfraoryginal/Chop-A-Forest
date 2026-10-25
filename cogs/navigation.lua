@@ -34,8 +34,13 @@ return function(C)
         if (root.Position-dest).Magnitude < radius then return true end
         if self.cfg.move == 'Instant TP' and not escape then
             root.CFrame = CFrame.new(dest) * root.CFrame.Rotation
-            task.wait(.23)
-            return valid() and (root.Position-dest).Magnitude <= radius + 2
+            task.wait(.045) -- just enough for an initial physics update
+            if not valid() then return false end
+            if (root.Position-dest).Magnitude <= radius+2 then return true end
+            -- One correction if the engine displaced us during the same frame.
+            root.CFrame=CFrame.new(dest)*root.CFrame.Rotation
+            task.wait(.05)
+            return valid() and (root.Position-dest).Magnitude <= radius+2
 
         end
         local function walk(point, close)

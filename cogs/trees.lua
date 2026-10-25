@@ -47,8 +47,8 @@ return function(C)
         if tree:GetAttribute('Felled')==true or (tree:GetAttribute('HP') or 1)<=0 then
             self.workTree=nil
             self.stats.trees=self.stats.trees+1
-            self.stage='WOOD: waiting for fall animation'
-            task.wait(.8)
+            self.stage='WOOD: falling in background'
+            task.wait(.045)
             return true
         end
         return false
