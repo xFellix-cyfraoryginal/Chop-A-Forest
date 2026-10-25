@@ -105,6 +105,7 @@ return function(C)
         end
     end
     function C:cancelMove()
+        if self.clearWorkHover then self:clearWorkHover() end
         if self.stopHover then self:stopHover() end
         self.motion = self.motion + 1
         local _, root, hum = self:character()
@@ -124,6 +125,7 @@ return function(C)
             end
         end
         self.skyHoldPosition,self.skyLanding=nil,nil
+        if self.disableAirHold then self:disableAirHold() end
         self.stage = 'STOPPED'
         self:note('Stopped (F6/F8 / button)')
     end
@@ -131,6 +133,7 @@ return function(C)
         if not self.live then return end
         self:stop()
         self.live = false
+        if self.disableAirHold then self:disableAirHold() end
         for _, conn in ipairs(self.connections) do pcall(function() conn:Disconnect() end) end
         if self.gui then pcall(function() self.gui:Destroy() end) end
         local env = (type(getgenv) == 'function' and getgenv()) or _G

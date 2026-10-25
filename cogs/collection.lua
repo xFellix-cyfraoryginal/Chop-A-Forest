@@ -4,8 +4,7 @@ return function(C)
         local job=self.wood[log]
         if not job or job.done or not self:woodReady(log,job) then return false end
         if self:isPaused() or self:urgentCombat()
-            or (not self.starterFarming and self.cfg.priority=='ATTACK'
-                and self.cfg.combat and self:pickSkeleton()) then return false end
+            or self:mobInterrupt() then return false end
         local _,bagOwned,carried=self:equipmentStatus()
         -- V9: without backpack, HUD is 0/5 and CarriedLogs counts 0..5.
         -- Continue collecting by hand; do not mistake 0/5 for owned backpack.
@@ -18,6 +17,7 @@ return function(C)
         if not self:goTo(at,self.cfg.pickupRange) then
             job.nextTry=os.clock()+2.5; return false
         end
+        if self.setWorkHover then self:setWorkHover(log,true) end
         if self:isPaused() or self:urgentCombat() or log.Parent~=self.logsFolder then
             return false
         end
@@ -25,8 +25,7 @@ return function(C)
         local success=false
         for attempt=1,2 do
             if not self.running or self:isPaused() or self:urgentCombat() or job.done
-                or (not self.starterFarming and self.cfg.priority=='ATTACK'
-                    and self:pickSkeleton()) then break end
+                or self:mobInterrupt() then break end
             local before=self:backpack()
             local oldCarry=self.player:GetAttribute('CarriedLogs') or 0
             if before==nil or before>=cap then break end

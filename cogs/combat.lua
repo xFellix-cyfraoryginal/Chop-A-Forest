@@ -9,6 +9,7 @@ return function(C)
     C.lastWalkMoveAt=-100
     function C:stopHover()
         self.followTarget=nil
+        if self.disableAirHold and not self.workHover then self:disableAirHold() end
         local _,root,hum=self:character()
         if hum and self.savedAutoRotate~=nil then
             hum.AutoRotate=self.savedAutoRotate
@@ -20,6 +21,7 @@ return function(C)
         if not self:enemyValid(enemy) then return false end
         local _,_,hum=self:character()
         if not hum then return false end
+        if self.clearWorkHover then self:clearWorkHover() end
         if self.savedAutoRotate==nil then self.savedAutoRotate=hum.AutoRotate end
         hum.AutoRotate=self.cfg.move=='Walk' and self.savedAutoRotate or false
         self.followTarget=enemy
@@ -32,12 +34,16 @@ return function(C)
         if not C.live or not C.running or not C.cfg.combat or C:isPaused() or not C:enemyValid(enemy) then
             C:stopHover(); return
         end
-        if C.isDodging and C:isDodging() then return end
+        if C.isDodging and C:isDodging() then
+            if C.disableAirHold then C:disableAirHold() end
+            return
+        end
         local _,root,hum=C:character()
         local at=C:enemyPosition(enemy)
         if not root or not at then C:stopHover(); return end
         if C.cfg.move=='Walk' then
             -- Walk mode follows moving enemies on the ground, with no TP.
+            if C.disableAirHold then C:disableAirHold() end
             hum.AutoRotate=C.savedAutoRotate~=false
             local goal=C:ground(at) or at
             local flatDistance=(Vector3.new(root.Position.X,0,root.Position.Z)
@@ -49,10 +55,20 @@ return function(C)
             return
         end
         hum.AutoRotate=false
-        -- Instant TP keeps the existing live-target hover and aim.
-        local goal=at+Vector3.new(.6,C.followHeight,.6)
-        local flat=Vector3.new(at.X,goal.Y,at.Z)
-        root.CFrame=CFrame.lookAt(goal,flat)
+        -- One continuous air orbit for Jack; live target hover for minions.
+        local boss=enemy:GetAttribute('Monster')=='Guardian'
+        local goal
+        if boss then
+            local angle=os.clock()*.95
+            local r=C.followHeight>=3.5 and 2.1 or 1.35
+            goal=at+Vector3.new(math.cos(angle)*r,C.followHeight,
+                math.sin(angle)*r)
+            C.stage='BOSS: air orbit + attacking'
+        else
+            goal=at+Vector3.new(.7,math.min(C.followHeight,3.2),.7)
+        end
+        if C.enableAirHold then C:enableAirHold(root) end
+        root.CFrame=CFrame.lookAt(goal,Vector3.new(at.X,goal.Y,at.Z))
         root.AssemblyLinearVelocity=Vector3.zero
         root.AssemblyAngularVelocity=Vector3.zero
     end)

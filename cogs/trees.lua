@@ -7,23 +7,33 @@ return function(C)
         local part = self:treePart(tree)
         if not part then return false end
         if not self:goTo(part.Position, self.cfg.treeRange) then return false end
+        if self.setWorkHover then self:setWorkHover(part) end
         self.stage = 'TREE: chopping'
         local failed, swings = 0, 0
         while self.running and self.cfg.farm and not self:isPaused() and not self:urgentCombat()
             and not self:mobInterrupt()
             and self:treeValid(tree) and swings < 65 do
-            if self.isDodging and self:isDodging() then return false end
+            if self.isDodging and self:isDodging() then
+                if self.clearWorkHover then self:clearWorkHover() end
+                return false
+            end
             part=self:treePart(tree)
+            if self.setWorkHover then self:setWorkHover(part) end
             if not part then break end
             local pos=self:position()
             if not pos then break end
             if (part.Position-pos).Magnitude>5.6 then
+                if self.clearWorkHover then self:clearWorkHover() end
                 if not self:goTo(part.Position,self.cfg.treeRange) then break end
+                if self.setWorkHover then self:setWorkHover(part) end
             end
             local previous=tree:GetAttribute('HP')
             local ok,reason=self:useItem(part.Position+Vector3.new(0,1.1,0),'Tree')
             if not ok then
-                if self.isDodging and self:isDodging() then return false end
+                if self.isDodging and self:isDodging() then
+                    if self.clearWorkHover then self:clearWorkHover() end
+                    return false
+                end
                 self:note(reason or 'No attack input'); failed=failed+1
             end
             if ok then
@@ -51,6 +61,7 @@ return function(C)
                 break
             end
         end
+        if self.clearWorkHover then self:clearWorkHover() end
         if tree:GetAttribute('Felled')==true or (tree:GetAttribute('HP') or 1)<=0 then
             self.workTree=nil
             self.stats.trees=self.stats.trees+1

@@ -15,6 +15,7 @@ return function(C)
         return position + Vector3.new(0, 2.5, 0)
     end
     function C:goTo(goal, radius, escape)
+        if self.clearWorkHover then self:clearWorkHover() end
         if not goal or not self.running then return false end
         if not escape and not self.shopping and not self.postBossAction and not self.starterFarming
             and self.cfg.priority=='ATTACK' and self.cfg.combat

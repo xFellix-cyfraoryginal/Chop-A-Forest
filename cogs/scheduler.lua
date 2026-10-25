@@ -51,6 +51,8 @@ return function(C)
             self.stage='DODGE: warning active'
             task.wait(.06); return
         end
+        -- Egg drops appear before the pumpkin bursts; use free PickPrompt.
+        if self.cfg.combat and self.eggStep and self:eggStep() then return end
         -- Finish boss pumpkin before resuming normal combat/tree work.
         if self.cfg.combat and self.postBossStep and self:postBossStep() then return end
         -- Mob priority remains skeleton -> pumpkinling -> guardian.
@@ -161,7 +163,7 @@ return function(C)
         self.eventSeen,self.eventPending={},{}
         local session=self.session
         self.stage='STARTING'
-        self:note('V4.7.9 FARM/MOBS: farm='..tostring(self.cfg.farm)
+        self:note('V4.8.0 FARM/MOBS: farm='..tostring(self.cfg.farm)
             ..', kill='..tostring(self.cfg.combat))
         task.spawn(function() self:watchSafety(session) end)
         task.spawn(function() self:tryBuyClawsSpeed('start balance') end)

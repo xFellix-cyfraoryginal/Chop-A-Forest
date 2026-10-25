@@ -1,24 +1,25 @@
-# Chop-A-Forest V4.7.9 — Automatic Claws Attack Speed after selling
+# Crop Forest V4.8.0 — Egg Pickup + Continuous Air Hover
 
-PATCH ONLY over V4.7.8. Replace exactly: main.lua, cogs/core.lua,
-cogs/claws.lua, cogs/scheduler.lua, cogs/ui.lua. Keep every other cog.
+PATCH ONLY over V4.7.9. Upload exactly these changed files and commit.
 
-- One and only automatic upgrade: Clawman Attack Speed, enabled by default.
-- Cost is read dynamically from Upgrades.Panel.Page2.Claws → Attack Speed → Price.Amount.
-- When Clawman Attack Speed is selected in TAB, can also read Detail.Info.Buy.Row.Right.
-- If UI price hasn't rendered, use V11 observed *level 0 only* cost 225;
-  levels 1+ require UI price; never assume later prices.
-- Following a cash payout from selling logs, check affordability immediately.
-- Purchase using V11 confirmed outgoing remote name/argument:
-  ReplicatedStorage.Shared.Services.ChopRemotes.BuyUpgrade:FireServer('ClawsSpeed').
-- Verify server attribute Up_ClawsSpeed increases; continue to next level if funds allow.
-- If server refuses, exponentially back off; no spam. V11 had 384 cash and
-  repeated requests at cost 225, yet level stayed 0, so acceptance is unproven.
-- Auto backpack still gets priority; NO Axe buying or other upgrades.
-- Claws MAX continues Tree Rush mode, skipping log pickup and sale.
-- Switch on panel: CLAW SPEED AUTO BUY ON/OFF; FARM, MOBS, WALK/TP unchanged.
+- `main.lua`: registers `hover.lua` and `egg.lua`, cache version 4.8.0.
+- `cogs/hover.lua` NEW: continuous air-hold during tree work and Instant TP,
+  no extra hover on sale or pumpkin. Dynamic trunk position per Heartbeat.
+- `cogs/combat.lua`: Guardian air orbit, live moving-target hover for minions;
+  Walk mode still moves normally. Dodge still interrupts hover until warning ends.
+- `cogs/trees.lua`, `cogs/collection.lua`: maintain hover on live trees and loose logs (short time-to-live for pickups); rebind after reposition.
+- `cogs/navigation.lua`, `cogs/core.lua`: clear air-hold on navigation,
+  Stop, unload, death and movement-mode changes.
+- `cogs/egg.lua` NEW: owner-only Workspace.EggDrops, free PickPrompt,
+  confirmed EggNotice and removal, never paid EggPrompt (25 gems).
+- `cogs/pumpkin.lua`: handle Model PumpkinHead (V12 confirmed Monster=Head)
+  by pivot / part; stay grounded for pumpkin smashing.
+- `cogs/scheduler.lua`: egg pickup ahead of pumpkin head and other farm work.
 
-Upload changed files to GitHub, commit, execute:
-loadstring(game:HttpGet('https://raw.githubusercontent.com/xFellix-cyfraoryginal/Chop-A-Forest/main/main.lua?v=4.7.9'))()
+Keeps existing Auto Backpack, Claws Speed Auto Buy, Claws MAX Tree Rush,
+Kill Mobs ON/OFF, Auto Farm ON/OFF, F6/F8, Walk mode, dodge.
 
-Static parse checked, Roblox game execution not tested.
+Run after commit:
+loadstring(game:HttpGet('https://raw.githubusercontent.com/xFellix-cyfraoryginal/Chop-A-Forest/main/main.lua?v=4.8.0'))()
+
+Static parse checked; requires in-game test. Executor may reject prompt simulation.

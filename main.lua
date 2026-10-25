@@ -1,11 +1,11 @@
 -- Chop-A-Forest | FARM + MOBS V4.7.9 | github.com/xFellix-cyfraoryginal/Chop-A-Forest
 -- All Lua/Luau, no build step. Upload main.lua and cogs/ together.
 local BASE = 'https://raw.githubusercontent.com/xFellix-cyfraoryginal/Chop-A-Forest/main/'
-local VERSION = '4.7.9'
+local VERSION = '4.8.0'
 local FILES = {
-    'core', 'world', 'navigation', 'tools', 'claws', 'survival',
+    'core', 'world', 'navigation', 'hover', 'tools', 'claws', 'survival',
     'trees', 'collection', 'combat', 'dodge',
-    'backpack', 'pumpkin', 'scheduler', 'ui'
+    'backpack', 'egg', 'pumpkin', 'scheduler', 'ui'
 }
 local env = (type(getgenv) == 'function' and getgenv()) or _G
 assert(type(loadstring) == 'function', '[CAF V4] Executor requires loadstring')
