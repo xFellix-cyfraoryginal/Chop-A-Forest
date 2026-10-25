@@ -57,6 +57,28 @@ return function(C)
         local have, capacity = label.Text:match('(%d+)%s*/%s*(%d+)')
         return tonumber(have), tonumber(capacity)
     end
+    -- Verified ownership: AxeBoughtAt exists in observed event logs.
+    -- Backpack purchase attribute isn't confirmed. Never infer ownership
+    -- solely from the "0/5" HUD; rely on a positive Gear marker if present.
+    function C:equipmentStatus()
+        local axe=self.player:GetAttribute('AxeBoughtAt')
+        local hasAxe=type(axe)=='number' and axe>0
+        local bagAttr
+        for _,key in ipairs({'BackpackBoughtAt','BagBoughtAt','GearBoughtAt',
+            'OwnsBackpack','OwnsBag','HasBackpack','BackpackOwned'}) do
+            local value=self.player:GetAttribute(key)
+            if value~=nil then
+                bagAttr=type(value)=='number' and value>0 or value==true
+                break
+            end
+        end
+        local carrying=self.player:GetAttribute('CarriedLogs')
+        local carried=type(carrying)=='number' and carrying or 0
+        local _,capacity=self:backpack()
+        -- Unknown isn't YES; a first-session purchase logger will reveal
+        -- the actual marker, and until then we use a cautious fallback.
+        return hasAxe,bagAttr,carried,capacity
+    end
     C.healthLabel = nil
     function C:health()
         local _, _, hum = self:character()

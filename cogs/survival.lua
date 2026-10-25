@@ -29,7 +29,9 @@ return function(C)
         return self.cfg.hpPause and os.clock() < self.hpHoldUntil
     end
     function C:urgentCombat()
-        if not self.cfg.combat or self:isPaused() then return false end
+        if not self.cfg.combat or self:isPaused() or self.cfg.priority=='ATTACK' then
+            return false -- ATTACK FIRST ignores Pumpkinling retaliation; HP safety stays active.
+        end
         if os.clock() > self.retaliateUntil then return false end
         local count = self:threats(self:position(), 18)
         return count > 0
@@ -149,7 +151,7 @@ return function(C)
                 self.lastDamageAt=now
                 self.retaliateUntil=now+self.cfg.retaliateSeconds
                 local mobCount=self:threats(self:position(),18)
-                if mobCount>0 and not self:isPaused()
+                if mobCount>0 and self.cfg.priority~='ATTACK' and not self:isPaused()
                     and not self.stage:find('COMBAT',1,true) then
                     self:cancelMove()
                 end

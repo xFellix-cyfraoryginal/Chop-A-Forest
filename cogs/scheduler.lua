@@ -14,18 +14,20 @@ return function(C)
             self.stage='WAIT: backpack HUD'; task.wait(.45); return
         end
         if self.cfg.priority=='ATTACK' and self.cfg.combat then
-            local count=self:threats(self:position(),math.huge)
-            if count>self.cfg.clearUntil then
-                local enemy=self:pickEnemy(math.huge,true) or self:pickBoss()
-                if enemy then self:fight(enemy); return end
+            -- ALWAYS chase a live Gravedigger/Skeleton, including the last
+            -- one. When none are present, farm trees to progress the event.
+            -- Do not divert to Biters/Pumpkinlings or the Guardian boss.
+            local skeleton=self:pickSkeleton()
+            if skeleton then
+                self.stage='EVENT: hunting skeleton'
+                self:fight(skeleton)
+                return
             end
-            -- A sole Guardian is not 'cleared' even though clearUntil = 1.
-            -- The event boss needs its own final-target step.
-            local boss=self:pickBoss()
-            if boss then self:fight(boss); return end
+            self.stage='EVENT: no skeletons; clearing trees'
         end
-        -- Either mode retaliates when hit by a nearby remaining mob.
-        if self:urgentCombat() then
+        -- FARM FIRST still defends itself if hurt. ATTACK FIRST strictly
+        -- skips pumpkin enemies, even when they are close to the character.
+        if self.cfg.priority~='ATTACK' and self:urgentCombat() then
             local enemy=self:pickEnemy(18)
             if enemy then self:fight(enemy); return end
         end
@@ -96,6 +98,25 @@ return function(C)
         if not self.treesFolder or not self.logsFolder then
             self:note('Missing Workspace.Map.Trees or Workspace.Logs'); return
         end
+        local axe,bag,carried,capacity=self:equipmentStatus()
+        if not axe then
+            self.stage='SETUP: buy AXE first'
+            self:note('Axe missing (AxeBoughtAt): buy the starter axe before START')
+            return
+        end
+        if bag==false or capacity==0 then
+            self.stage='SETUP: buy BACKPACK first'
+            self:note('Backpack missing: buy it before automatic E pickups')
+            return
+        end
+        if carried>0 then
+            self.stage='SETUP: hands holding logs'
+            self:note('CarriedLogs > 0: deposit held logs before START')
+            return
+        end
+        if bag==nil then
+            self:note('Backpack ownership unverified; E pickup guarded by CarriedLogs')
+        end
         self.running=true; self.session=self.session+1
         self.panic=false; self.lastHP=nil
         self.hpHoldUntil=0; self.retaliateUntil=0; self.pendingHold=false
@@ -103,7 +124,7 @@ return function(C)
         self.safeTree=nil; self.safeTreeUntil=0
         local session=self.session
         self.stage='STARTING'
-        self:note('V4.5 TELEGRAPH DODGE '..self.cfg.priority..' FIRST / '..self.cfg.move)
+        self:note('V4.6 SKELETON FOCUS '..self.cfg.priority..' FIRST / '..self.cfg.move)
         task.spawn(function() self:watchSafety(session) end)
         task.spawn(function() self:workLoop(session) end)
     end

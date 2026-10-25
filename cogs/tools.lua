@@ -167,7 +167,7 @@ return function(C)
     function C:useItem(target, purpose)
         if not self.running or self:isPaused() then return false end
         if self.isDodging and self:isDodging() then return false,'Dodging red zone' end
-        if purpose~='Combat' and self:urgentCombat() then
+        if purpose~='Combat' and self.cfg.priority~='ATTACK' and self:urgentCombat() then
             return false,'Retaliating against mob'
         end
         -- E picks up logs without swinging the equipped axe. Do not

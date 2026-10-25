@@ -70,6 +70,40 @@ return function(C)
         end
         return chosen
     end
+    -- Special event priority: Gravedigger/skeletons (known Sprout), not
+    -- Pumpkinling Biters or The Jack o' Lantern. New skeleton-named enemies
+    -- are picked up automatically if their shared MonsterId/HP attrs match.
+    function C:isSkeleton(enemy)
+        if not self:enemyValid(enemy) then return false end
+        if enemy:GetAttribute('Monster')=='Guardian' then return false end
+        local name=(enemy.Name..' '..tostring(enemy:GetAttribute('DisplayName') or '')):lower()
+        if name:find('pumpkin',1,true) or name:find('biter',1,true)
+            or name:find('jack',1,true) then return false end
+        for _,marker in ipairs({'skeleton','gravedigger','sprout','undead','bone'}) do
+            if name:find(marker,1,true) then return true end
+        end
+        return false
+    end
+    function C:skeletonCount()
+        local count=0
+        for mob in pairs(self.enemies) do
+            if self:isSkeleton(mob) then count=count+1 end
+        end
+        return count
+    end
+    function C:pickSkeleton()
+        local from=self:position()
+        if not from then return nil end
+        local best,dist=nil,math.huge
+        for mob in pairs(self.enemies) do
+            if self:isSkeleton(mob) and os.clock()>=(self.enemyRetry[mob] or 0) then
+                local at=self:enemyPosition(mob)
+                local d=at and (at-from).Magnitude or math.huge
+                if d<dist then best,dist=mob,d end
+            end
+        end
+        return best
+    end
     function C:pickBoss()
         local best,dist=nil,math.huge
         local from=self:position()

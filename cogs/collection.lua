@@ -4,6 +4,13 @@ return function(C)
         local job=self.wood[log]
         if not job or job.done or not self:woodReady(log,job) then return false end
         if self:isPaused() or self:urgentCombat() then return false end
+        local _,bagOwned,carried=self:equipmentStatus()
+        if bagOwned==false or carried>0 then
+            self.stage='WOOD: backpack required / hands occupied'
+            self:note('E pickup blocked: no backpack or hands carry logs')
+            task.wait(.4)
+            return false
+        end
         local have,cap=self:backpack()
         if not have or not cap or have>=cap then return false end
         local at=self:woodPosition(log)

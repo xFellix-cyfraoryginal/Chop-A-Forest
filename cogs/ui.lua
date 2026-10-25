@@ -30,7 +30,7 @@ return function(C)
     local top=round(make('Frame',{Size=UDim2.new(1,0,0,48),
         BackgroundColor3=surface,BorderSizePixel=0},panel),12)
     make('TextLabel',{Size=UDim2.new(1,-92,1,0),Position=UDim2.fromOffset(13,0),
-        BackgroundTransparency=1,Text='CHOP A FOREST  /  DODGE V4.5',TextSize=14,
+        BackgroundTransparency=1,Text='CHOP A FOREST / SKELETON V4.6',TextSize=14,
         Font=Enum.Font.GothamBold,TextColor3=ink,TextXAlignment=Enum.TextXAlignment.Left},top)
     local function button(parent,text,y,height,color,clicked)
         local b=round(make('TextButton',{Size=UDim2.new(1,-20,0,height or 37),
@@ -101,9 +101,9 @@ return function(C)
     C:connect(priorityBtn.MouseButton1Click,function()
         C.cfg.priority=C.cfg.priority=='FARM' and 'ATTACK' or 'FARM'
         priorityBtn.Text='Priority: '..C.cfg.priority..' FIRST'
-        C:note('Priority changed: '..C.cfg.priority..' FIRST')
+        C:note('Priority changed: '..C.cfg.priority..' FIRST (ATTACK = skeletons only)')
     end)
-    label(main,'F8  |  EMERGENCY STOP',237,12)
+    label(main,'ATTACK = Gravediggers only  |  F8 STOP',237,12)
     local tools=pages.TOOLS
     label(tools,'Equip owned tools in-game before using them.',6,12)
     local profile=button(tools,'Tool: Auto',47,39,surface,function() end)
@@ -193,8 +193,8 @@ return function(C)
             runButton.BackgroundColor3=C.running and red or green
             local info=C.treeScan or {}
             local threats=C:threats(C:position(),math.huge)
-            debugInfo.Text=string.format('Trees %d/%d  |  Mobs %d  |  Dodge %d  |  Axe %.2fs',
-                info.valid or 0,info.cached or 0,threats,C.stats.dodges or 0,C.axeDelay or .33)
+            debugInfo.Text=string.format('Trees %d/%d | Skel %d | Mobs %d | Dodge %d',
+                info.valid or 0,info.cached or 0,C:skeletonCount(),threats,C.stats.dodges or 0)
             task.wait(.65)
         end
     end)

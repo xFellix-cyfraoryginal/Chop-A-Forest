@@ -1,28 +1,15 @@
-# Chop-A-Forest V4.5 — Telegraph Dodge (PATCH ONLY)
+# CropForest V4.6 Skeleton Focus — PATCH ONLY
 
-**Base:** V4.3 **or** V4.4. This ZIP has just the updated files, not the whole repository. Existing `cogs/world.lua` and `cogs/survival.lua` remain untouched. Upload the included `main.lua` plus the included `cogs/*.lua` into their respective paths and Commit to GitHub.
+Base: V4.5 RED DODGE (with V4.4 Sell Pipeline if you used it).
+Copy only main.lua and files under cogs/ to matching paths on GitHub.
+Do not delete other cogs, especially cogs/dodge.lua.
 
-**New cog:** `cogs/dodge.lua` — required by V4.5 `main.lua`. Upload it before executing the loader.
+## Changes
+- ATTACK FIRST = unlimited-range hunt of all valid Gravedigger / Graveyard_Sprout / skeleton-like mobs, including final remaining enemy.
+- Skips Graveyard_Biter (Pumpkinling) and Guardian (Jack o' Lantern). When no skeletons, switches to normal tree + log pipeline.
+- FARM FIRST remains the existing behavior (self-defense on actual damage).
+- Startup checks real AxeBoughtAt. If none, stops and asks for manual axe purchase (Auto Buy is not implemented without a verified purchase protocol).
+- Backpack checks a small set of ownership attributes IF game exposes one; with an unknown marker cannot claim it is owned. Stops if carrying logs in hands (`CarriedLogs > 0`) so E doesn't drop carried wood.
+- Use separate RAW logger to capture TAB upgrade purchases and item ownership. The logger is NOT in the GitHub patch.
 
-## New features
-
-- **Automatic red-floor telegraph dodge:** observes the verified inbound `ReplicatedStorage.Shared.Services.ChopRemotes.MonsterFx` RemoteEvent. Its `Warn` event provides exact circle (`At`, `Radius`) or line (`From`, `Dir`, `Width`, `Length`) geometry plus the advance-warning duration (`Time`). No method hooks, fake remote calls, or screen image recognition.
-- Chooses the nearest position outside all currently visible dangerous shapes, with an extra spatial margin. Uses emergency repositioning (independent of Walk/Instant TP). Checks while chopping/collecting/fighting and prevents the live mob hover controller from immediately undoing the dodge.
-- Tracks `FireTrail` lines separately for their reported duration. Existing wood queue and combat targeting remain intact; F8 immediately stops.
-- **Jack o' Lantern boss:** recognized from `Monster='Guardian'` and `MonsterId`, `HP`, `MaxHP`, `State`. ATTACK FIRST does not stop at one remaining Guardian. It prefers to finish minions before the boss. Fights are still dependent on game-confirmed damage.
-- **Chainsaw (beta, still opt-in):** Auto profile can read the game's actual `Player:GetAttribute('Tool')`; includes the observed `Revving`/`SawHeat` conditions and longer mouse hold while equipped. No guessed reload key; V8.1 does not confirm a reload mechanic. Use TOOLS > `Unverified tools: ON` to try it, and watch HP changes.
-- Keeps V4.4 Sell Sync + Pipeline improvements even if you were previously on V4.3. DEBUG shows the Dodge count and exports it.
-
-## Captured telemetry behind this change
-
-The supplied BossScout V8.1 JSON captured **32** warning packets: `Bite` 14, `Pumpkin` 6, `Slam` 5, `Roll` 4, `Snare` 2, `Summon` 1. Bite circle was radius 4.5 and 0.45-second warning; Slam around radius 20.4, 1–1.1 seconds; Pumpkin radius 10.5 and 1.5 seconds; Roll line around width 20.16 and 1.4 seconds; Snare line width 12 and 1.2 seconds. The logs also contain `Revving`, `SawHeat`, `SawHeatRate` for the Chainsaw, but no proven reload sequence.
-
-## Load after uploading + GitHub commit
-
-```lua
-loadstring(game:HttpGet('https://raw.githubusercontent.com/xFellix-cyfraoryginal/Chop-A-Forest/main/main.lua?v=4.5.0'))()
-```
-
-Expected UI banner: `CHOP A FOREST / DODGE V4.5`.
-
-**Testing limitation:** all Lua sources compiled successfully in a local Lua interpreter and warning packet schemas were validated against the provided logs. We cannot run Roblox server physics or know whether every emergency movement will be accepted; teleport anti-cheat/server correction may cause a dodge to fail. The data does not establish that all red areas harm players at every height, so this intentionally uses conservative XZ footprints.
+Notes: model name Gravedigger is confirmed by the previous Halloween logger. New unknown skeleton types need an updated signature. Roblox testing not possible in this environment.
