@@ -87,7 +87,10 @@ return function(C)
         if not self.running or self:isPaused() then return false end
         if not self:mouseDown() then return false end
         local deadline = os.clock() + duration
-        while self.running and not self:isPaused() and os.clock() < deadline do task.wait(.06) end
+        while self.running and not self:isPaused()
+            and not (self.isDodging and self:isDodging()) and os.clock() < deadline do
+            task.wait(.06)
+        end
         self:releaseMouse()
         return true
     end
@@ -105,6 +108,15 @@ return function(C)
         local name = held and held.Name:lower() or ''
         local preferred=self.cfg.tool
         if preferred ~= 'Auto' then return preferred, held end
+        local gameTool=self.player:GetAttribute('Tool')
+        if type(gameTool)=='string' then
+            local lower=gameTool:lower()
+            if lower:find('chain') then return 'Chainsaw',held end
+            if lower:find('vacuum') then return 'Vacuum',held end
+            if lower:find('pistol') then return 'Pistol',held end
+            if lower:find('axe') then return 'Axe',held end
+            if lower:find('fist') then return 'Fists',held end
+        end
         if name:find('chain') or name:find('saw') then return 'Chainsaw',held end
         if name:find('vacuum') or name:find('vac') then return 'Vacuum',held end
         if name:find('pistol') or name:find('gun') then return 'Pistol',held end
@@ -154,6 +166,7 @@ return function(C)
     end
     function C:useItem(target, purpose)
         if not self.running or self:isPaused() then return false end
+        if self.isDodging and self:isDodging() then return false,'Dodging red zone' end
         if purpose~='Combat' and self:urgentCombat() then
             return false,'Retaliating against mob'
         end
@@ -185,6 +198,17 @@ return function(C)
                 profile,held=self:activeProfile()
             end
         end
+        -- Auto never stalls just because the player last equipped an
+        -- unverified Chainsaw/Pistol/Vacuum; return to the proven Axe slot.
+        if self.cfg.tool=='Auto' and not self.cfg.useExperimental
+            and (profile=='Chainsaw' or profile=='Pistol' or profile=='Vacuum')
+            and purpose~='Pickup' then
+            self:pressSlot(2)
+            profile,held=self:activeProfile()
+            if profile=='Chainsaw' or profile=='Pistol' or profile=='Vacuum' then
+                return false,'Axe not equipped; experimental tool remains OFF'
+            end
+        end
         -- Unsupported equipment uses experimental generic input only when opted in.
         if purpose=='Tree' and (profile=='Pistol' or profile=='Vacuum') then
             return false, 'Incompatible tool for tree'
@@ -205,7 +229,7 @@ return function(C)
             and not self.cfg.useExperimental then
             return false, 'Tool beta disabled'
         end
-        if (profile=='Chainsaw' or profile=='Vacuum' or profile=='Pistol') and not held then
+        if (profile=='Chainsaw' or profile=='Vacuum' or profile=='Pistol') and not held and self.player:GetAttribute('Tool')~=profile then
             return false, 'Equip the selected tool in game first'
         end
         if profile=='Axe' then self:pressSlot(2)
@@ -218,6 +242,7 @@ return function(C)
             task.wait(math.min(.08,waitUntil-now)); now=os.clock()
         end
         if not self.running or self:isPaused() then return false end
+        if self.isDodging and self:isDodging() then return false,'Dodging red zone' end
         local aimPoint=target
         if type(target)=='function' then
             local ok,pos=pcall(target)
@@ -231,8 +256,16 @@ return function(C)
             task.wait(.035) -- allow camera/input frame to observe the new aim
         end
         if not self.running or self:isPaused() then return false end
+        if self.isDodging and self:isDodging() then return false,'Dodging red zone' end
         local worked
-        if profile=='Chainsaw' or (profile=='Vacuum' and purpose=='PickupClick') then
+        if profile=='Chainsaw' then
+            -- V8.1 confirms heat/rev attributes, but NOT a reload mechanic.
+            local heat=self.player:GetAttribute('SawHeat')
+            if type(heat)=='number' and heat>.85 then
+                return false,'Chainsaw hot: let it cool'
+            end
+            worked=self:hold(1.15)
+        elseif profile=='Vacuum' and purpose=='PickupClick' then
             worked=self:hold(.40)
         else worked=self:tap() end
         if worked then

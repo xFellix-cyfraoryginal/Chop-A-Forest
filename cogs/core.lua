@@ -119,6 +119,7 @@ return function(C)
         if env.CAF_V4 == self then env.CAF_V4 = nil end
         if env.CAF_ALPHA == self then env.CAF_ALPHA = nil end
         self.wood = {}
+        self.hazards = {}
         self.trees, self.enemies = {}, {}
     end
     C:connect(C.uis.InputBegan, function(input, consumed)

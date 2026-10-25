@@ -5,6 +5,10 @@ return function(C)
             self.stage='HP PAUSE: '..math.max(0,math.ceil(self.hpHoldUntil-os.clock()))..'s'
             task.wait(.18); return
         end
+        if self.isDodging and self:isDodging() then
+            self.stage='DODGE: warning active'
+            task.wait(.06); return
+        end
         local bag,cap=self:backpack()
         if bag==nil then
             self.stage='WAIT: backpack HUD'; task.wait(.45); return
@@ -12,9 +16,13 @@ return function(C)
         if self.cfg.priority=='ATTACK' and self.cfg.combat then
             local count=self:threats(self:position(),math.huge)
             if count>self.cfg.clearUntil then
-                local enemy=self:pickEnemy(math.huge)
+                local enemy=self:pickEnemy(math.huge,true) or self:pickBoss()
                 if enemy then self:fight(enemy); return end
             end
+            -- A sole Guardian is not 'cleared' even though clearUntil = 1.
+            -- The event boss needs its own final-target step.
+            local boss=self:pickBoss()
+            if boss then self:fight(boss); return end
         end
         -- Either mode retaliates when hit by a nearby remaining mob.
         if self:urgentCombat() then
@@ -95,7 +103,7 @@ return function(C)
         self.safeTree=nil; self.safeTreeUntil=0
         local session=self.session
         self.stage='STARTING'
-        self:note('V4.4 PIPELINE '..self.cfg.priority..' FIRST / '..self.cfg.move)
+        self:note('V4.5 TELEGRAPH DODGE '..self.cfg.priority..' FIRST / '..self.cfg.move)
         task.spawn(function() self:watchSafety(session) end)
         task.spawn(function() self:workLoop(session) end)
     end

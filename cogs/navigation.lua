@@ -16,6 +16,7 @@ return function(C)
     end
     function C:goTo(goal, radius, escape)
         if not goal or not self.running then return false end
+        if not escape and self.isDodging and self:isDodging() then return false end
         if (self:isPaused() or (self:urgentCombat() and not self.stage:find('COMBAT',1,true)))
             and not escape then return false end
         local _, root, hum = self:character()
@@ -25,7 +26,8 @@ return function(C)
         local function valid()
             return self.live and self.running and token == self.motion
                 and session == self.session and hum.Health > 0
-                and (escape or (not self:isPaused()
+                and (escape or (not (self.isDodging and self:isDodging())
+                    and not self:isPaused()
                     and (not self:urgentCombat() or self.stage:find('COMBAT',1,true))))
         end
         radius = radius or 3.5

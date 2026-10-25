@@ -29,6 +29,7 @@ return function(C)
         if not C.live or not C.running or C:isPaused() or not C:enemyValid(enemy) then
             C:stopHover(); return
         end
+        if C.isDodging and C:isDodging() then return end
         local _,root,hum=C:character()
         local at=C:enemyPosition(enemy)
         if not root or not at then C:stopHover(); return end
@@ -45,11 +46,11 @@ return function(C)
     -- Tool useItem also resolves the point again immediately before a click.
     C:connect(rs.RenderStepped,function()
         local enemy=C.followTarget
-        if not enemy or not C.running then return end
+        if not enemy or not C.running or (C.isDodging and C:isDodging()) then return end
         local at=C:enemyPosition(enemy)
         if at then C:aimAt(at+Vector3.new(0,.55,0)) end
     end)
-    function C:pickEnemy(radius)
+    function C:pickEnemy(radius,ignoreBoss)
         if not self.cfg.combat then return nil end
         local from=self:position()
         if not from then return nil end
@@ -58,6 +59,7 @@ return function(C)
         radius=radius or math.huge
         for mob in pairs(self.enemies) do
             if self:enemyValid(mob)
+                and (not ignoreBoss or mob:GetAttribute('Monster')~='Guardian')
                 and os.clock()>=(self.enemyRetry[mob] or 0) then
                 local at=self:enemyPosition(mob)
                 if at then
@@ -67,6 +69,20 @@ return function(C)
             end
         end
         return chosen
+    end
+    function C:pickBoss()
+        local best,dist=nil,math.huge
+        local from=self:position()
+        if not from then return nil end
+        for mob in pairs(self.enemies) do
+            if self:enemyValid(mob) and mob:GetAttribute('Monster')=='Guardian'
+                and os.clock()>=(self.enemyRetry[mob] or 0) then
+                local at=self:enemyPosition(mob)
+                local d=at and (at-from).Magnitude or math.huge
+                if d<dist then best,dist=mob,d end
+            end
+        end
+        return best
     end
     function C:fight(enemy)
         if not self:enemyValid(enemy) or self:isPaused() then return false end
@@ -79,6 +95,9 @@ return function(C)
         while self.running and not self:isPaused() and self:enemyValid(enemy)
             and shots<40 and os.clock()<deadline do
             if self.cfg.priority=='FARM' and not self:urgentCombat() then break end
+            if self.isDodging and self:isDodging() then
+                task.wait(.05)
+            else
             local at=self:enemyPosition(enemy)
             if not at then break end
             self.stage='COMBAT: hovering + attacking'
@@ -113,6 +132,7 @@ return function(C)
                     break
                 end
             end
+            end -- dodge gate
         end
         self:stopHover()
         self.followHeight=3.8

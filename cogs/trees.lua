@@ -10,6 +10,7 @@ return function(C)
         local failed, swings = 0, 0
         while self.running and not self:isPaused() and not self:urgentCombat()
             and self:treeValid(tree) and swings < 65 do
+            if self.isDodging and self:isDodging() then return false end
             part=self:treePart(tree)
             if not part then break end
             local pos=self:position()
@@ -19,7 +20,10 @@ return function(C)
             end
             local previous=tree:GetAttribute('HP')
             local ok,reason=self:useItem(part.Position+Vector3.new(0,1.1,0),'Tree')
-            if not ok then self:note(reason or 'No attack input'); failed=failed+1 end
+            if not ok then
+                if self.isDodging and self:isDodging() then return false end
+                self:note(reason or 'No attack input'); failed=failed+1
+            end
             if ok then
                 local deadline=os.clock()+1.15
                 local changed=false

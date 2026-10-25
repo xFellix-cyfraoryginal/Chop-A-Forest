@@ -21,7 +21,7 @@ return function(C)
         local ok,custom=pcall(gethui)
         if ok and custom then parent=custom end
     end
-    local gui=make('ScreenGui',{Name='CAF_SellSync_V4_4',ResetOnSpawn=false,
+    local gui=make('ScreenGui',{Name='CAF_Telegraph_V4_5',ResetOnSpawn=false,
         IgnoreGuiInset=true,ZIndexBehavior=Enum.ZIndexBehavior.Sibling},parent)
     C.gui=gui
     local panel=round(make('Frame',{Size=UDim2.fromOffset(394,382),
@@ -30,7 +30,7 @@ return function(C)
     local top=round(make('Frame',{Size=UDim2.new(1,0,0,48),
         BackgroundColor3=surface,BorderSizePixel=0},panel),12)
     make('TextLabel',{Size=UDim2.new(1,-92,1,0),Position=UDim2.fromOffset(13,0),
-        BackgroundTransparency=1,Text='CHOP A FOREST  /  PIPELINE V4.4',TextSize=14,
+        BackgroundTransparency=1,Text='CHOP A FOREST  /  DODGE V4.5',TextSize=14,
         Font=Enum.Font.GothamBold,TextColor3=ink,TextXAlignment=Enum.TextXAlignment.Left},top)
     local function button(parent,text,y,height,color,clicked)
         local b=round(make('TextButton',{Size=UDim2.new(1,-20,0,height or 37),
@@ -143,7 +143,8 @@ return function(C)
     local expBtn=button(debug,'EXPORT DIAGNOSTICS',49,39,blue,function()
         local records={version=C.version,stage=C.stage,stats=C.stats,
             messages=C.messages,settings=C.cfg,wood=C:woodCounts(),
-            sales=C.sellAudit or {},
+            sales=C.sellAudit or {},dodges=C.stats.dodges,
+            activeWarnings=#(C.hazards or {}),dodgeAudit=C.dodgeAudit or {},
             running=C.running}
         local ok,data=pcall(function() return C.http:JSONEncode(records) end)
         if not ok then C:note('Export failed'); return end
@@ -192,8 +193,8 @@ return function(C)
             runButton.BackgroundColor3=C.running and red or green
             local info=C.treeScan or {}
             local threats=C:threats(C:position(),math.huge)
-            debugInfo.Text=string.format('Trees %d/%d  |  Mobs %d  |  Kills %d  |  Axe %.2fs',
-                info.valid or 0,info.cached or 0,threats,C.stats.kills,C.axeDelay or .33)
+            debugInfo.Text=string.format('Trees %d/%d  |  Mobs %d  |  Dodge %d  |  Axe %.2fs',
+                info.valid or 0,info.cached or 0,threats,C.stats.dodges or 0,C.axeDelay or .33)
             task.wait(.65)
         end
     end)

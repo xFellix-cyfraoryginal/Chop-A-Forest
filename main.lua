@@ -1,10 +1,10 @@
--- Chop-A-Forest | SELL SYNC V4.4 | github.com/xFellix-cyfraoryginal/Chop-A-Forest
+-- Chop-A-Forest | TELEGRAPH DODGE V4.5 | github.com/xFellix-cyfraoryginal/Chop-A-Forest
 -- All Lua/Luau, no build step. Upload main.lua and cogs/ together.
 local BASE = 'https://raw.githubusercontent.com/xFellix-cyfraoryginal/Chop-A-Forest/main/'
-local VERSION = '4.4.0'
+local VERSION = '4.5.0'
 local FILES = {
     'core', 'world', 'navigation', 'tools', 'survival',
-    'trees', 'collection', 'combat', 'scheduler', 'ui'
+    'trees', 'collection', 'combat', 'dodge', 'scheduler', 'ui'
 }
 local env = (type(getgenv) == 'function' and getgenv()) or _G
 assert(type(loadstring) == 'function', '[CAF V4] Executor requires loadstring')
@@ -36,4 +36,4 @@ if not ok then
     error('[CAF V4] Start failed: ' .. tostring(err))
 end
 env.CAF_V4, env.CAF_ALPHA = C, C
-print('[CAF V4] PIPELINE ' .. VERSION .. ' ready (F8 = STOP)')
+print('[CAF V4] DODGE ' .. VERSION .. ' ready (F8 = STOP)')
