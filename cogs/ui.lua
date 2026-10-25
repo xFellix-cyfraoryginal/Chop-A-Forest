@@ -1,4 +1,4 @@
--- V4.7.4: one compact panel; farm and combat toggles only.
+-- V4.7.5: compact farm/combat panel + Walk/Instant TP movement.
 return function(C)
     local function make(class,props,parent)
         local obj=Instance.new(class)
@@ -21,10 +21,10 @@ return function(C)
         local ok,hui=pcall(gethui)
         if ok and hui then parent=hui end
     end
-    local gui=make('ScreenGui',{Name='CAF_FarmMobs_V4_7_4',ResetOnSpawn=false,
+    local gui=make('ScreenGui',{Name='CAF_FarmMobs_V4_7_5',ResetOnSpawn=false,
         IgnoreGuiInset=true,ZIndexBehavior=Enum.ZIndexBehavior.Sibling},parent)
     C.gui=gui
-    local panel=round(make('Frame',{Size=UDim2.fromOffset(344,273),
+    local panel=round(make('Frame',{Size=UDim2.fromOffset(344,322),
         Position=UDim2.fromOffset(24,112),BackgroundColor3=dark,BorderSizePixel=0},gui),11)
     make('UIStroke',{Color=Color3.fromRGB(68,83,106),Thickness=1},panel)
     local head=round(make('Frame',{Size=UDim2.new(1,0,0,44),
@@ -47,7 +47,7 @@ return function(C)
         Size=UDim2.new(1,0,1,-44),BackgroundTransparency=1},panel)
     action(head,'_',7,29,dark,function()
         collapsed=not collapsed
-        panel.Size=UDim2.fromOffset(344,collapsed and 44 or 273)
+        panel.Size=UDim2.fromOffset(344,collapsed and 44 or 322)
         body.Visible=not collapsed
     end,272,28)
     local taskLabel=make('TextLabel',{Position=UDim2.fromOffset(12,7),
@@ -74,7 +74,13 @@ return function(C)
         end
         C:note('Kill Mobs '..(C.cfg.combat and 'ON' or 'OFF'))
     end)
-    make('TextLabel',{Position=UDim2.fromOffset(12,205),Size=UDim2.new(1,-24,0,22),
+    local move=action(body,'MOVEMENT: '..C.cfg.move,211,38,surface,function()
+        C.cfg.move=(C.cfg.move=='Walk') and 'Instant TP' or 'Walk'
+        -- Interrupt an old MoveTo/path without cancelling an active combat target.
+        C.motion=C.motion+1
+        C:note('Movement changed to '..C.cfg.move)
+    end)
+    make('TextLabel',{Position=UDim2.fromOffset(12,253),Size=UDim2.new(1,-24,0,22),
         BackgroundTransparency=1,Text='F6 START/STOP   |   F8 STOP',
         TextSize=11,TextColor3=muted,Font=Enum.Font.Gotham,
         TextXAlignment=Enum.TextXAlignment.Left},body)
@@ -111,6 +117,8 @@ return function(C)
             farm.BackgroundColor3=C.cfg.farm and green or surface
             combat.Text='KILL MOBS: '..(C.cfg.combat and 'ON' or 'OFF')
             combat.BackgroundColor3=C.cfg.combat and green or surface
+            move.Text='MOVEMENT: '..C.cfg.move
+            move.BackgroundColor3=C.cfg.move=='Walk' and green or surface
             task.wait(.28)
         end
     end)

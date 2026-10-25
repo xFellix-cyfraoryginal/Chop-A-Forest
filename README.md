@@ -1,12 +1,12 @@
-# Chop-A-Forest V4.7.4 — FARM + MOBS ONLY (PATCH)
+# Chop-A-Forest V4.7.5 — WALK MODE ONLY PATCH
 
-Upgrade from V4.7.3 by uploading **main.lua** and the **six supplied cogs** (core, scheduler, trees, combat, tools, ui). Do not delete your old world/navigation/survival/collection/dodge files. This patch deliberately DOES NOT load cogs/starter.lua, cogs/upgrades.lua or cogs/endless.lua, even if they remain on GitHub.
+Apply over **V4.7.4** by replacing only `main.lua`, `cogs/ui.lua` and `cogs/combat.lua`. Do not remove `cogs/navigation.lua` — its existing pathfinding/MoveTo implementation enables Walk mode.
 
-Only three buttons: START/STOP (F6/F8), AUTO FARM ON/OFF, KILL MOBS ON/OFF. Default both on: chop -> collect -> sell, interrupted by newly spawned or initially present monsters. Skeletons first, Pumpkinlings second, Guardian boss last. Existing dodge/HP retreat still protect the character.
+The compact panel now has a **MOVEMENT: Instant TP / Walk** button (default Instant TP). Click it to switch at runtime. Walk uses Humanoid MoveTo and pathfinding for trees, wood, sell and mobs; combat chases moving enemies on foot rather than teleporting above them. The existing red-warning dodge and HP emergency retreat are still allowed to reposition instantly for survival. Walking is slower, especially against moving bosses.
 
-No Auto Buy axe/backpack, no Auto Upgrade, no shop UI click, no Endless click. Equipment is manually purchased/upgraded in the game. The script can chop with fists if no axe yet, but manually equipped Axe is recommended. When Farm OFF, it stops starting wood tasks; Kill Mobs can run independently. Finish an active sell transaction before another task to avoid bag desync.
+Everything else is unchanged: AUTO FARM ON/OFF, KILL MOBS ON/OFF, F6 start/stop, F8 emergency stop. No auto-buy Axe/Backpack, upgrades or auto-Endless.
 
-After committing the changed files:
-`loadstring(game:HttpGet("https://raw.githubusercontent.com/xFellix-cyfraoryginal/Chop-A-Forest/main/main.lua?v=4.7.4"))()`
+Loader:
+`loadstring(game:HttpGet("https://raw.githubusercontent.com/xFellix-cyfraoryginal/Chop-A-Forest/main/main.lua?v=4.7.5"))()`
 
-Local syntax and mock logic tests are not proof of in-game behavior; verify with your Roblox session.
+Syntax validated locally. Real in-game movement not tested.
