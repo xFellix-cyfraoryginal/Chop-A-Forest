@@ -1,4 +1,4 @@
--- V4.7.5: compact farm/combat panel + Walk/Instant TP movement.
+-- V4.7.8: compact farm/combat panel + Walk/Instant TP movement.
 return function(C)
     local function make(class,props,parent)
         local obj=Instance.new(class)
@@ -21,7 +21,7 @@ return function(C)
         local ok,hui=pcall(gethui)
         if ok and hui then parent=hui end
     end
-    local gui=make('ScreenGui',{Name='CAF_FarmMobs_V4_7_5',ResetOnSpawn=false,
+    local gui=make('ScreenGui',{Name='CAF_FarmMobs_V4_7_8',ResetOnSpawn=false,
         IgnoreGuiInset=true,ZIndexBehavior=Enum.ZIndexBehavior.Sibling},parent)
     C.gui=gui
     local panel=round(make('Frame',{Size=UDim2.fromOffset(344,322),

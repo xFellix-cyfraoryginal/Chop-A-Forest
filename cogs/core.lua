@@ -17,6 +17,7 @@ return function(C)
     C.cfg = {
         move = 'Instant TP', priority = 'EVENT', tool = 'Auto',
         farm = true, combat = true, collect = true, sell = true,
+        autoBackpack = true,
         hpPause = true, pauseHP = 0.40, pauseSeconds = 6,
         retaliateSeconds = 9, clearUntil = 1, combatRadius = 65,
         pickupRange = 3.7, treeRange = 3.7,
@@ -147,6 +148,7 @@ return function(C)
         if consumed then return end
         if input.KeyCode == Enum.KeyCode.One then C.toolSlot = '1' end
         if input.KeyCode == Enum.KeyCode.Two then C.toolSlot = '2' end
+        if input.KeyCode == Enum.KeyCode.Three then C.toolSlot = '3' end
     end)
     C:connect(C.player.CharacterRemoving, function() C:stop() end)
     task.defer(function() if C.live then C:findHealthLabel() end end)

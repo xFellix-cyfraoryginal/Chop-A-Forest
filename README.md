@@ -1,12 +1,16 @@
-# Chop-A-Forest V4.7.5 — WALK MODE ONLY PATCH
+# Chop-A-Forest V4.7.8 — Backpack, Boss/Pumpkin, Claws MAX Tree Rush
 
-Apply over **V4.7.4** by replacing only `main.lua`, `cogs/ui.lua` and `cogs/combat.lua`. Do not remove `cogs/navigation.lua` — its existing pathfinding/MoveTo implementation enables Walk mode.
+Patch over V4.7.5 (the existing Walk Mode version). Replace ONLY listed Lua files.
+Add cogs/backpack.lua, cogs/claws.lua and cogs/pumpkin.lua. Do not delete cogs/world.lua, cogs/collection.lua, cogs/survival.lua or cogs/dodge.lua.
 
-The compact panel now has a **MOVEMENT: Instant TP / Walk** button (default Instant TP). Click it to switch at runtime. Walk uses Humanoid MoveTo and pathfinding for trees, wood, sell and mobs; combat chases moving enemies on foot rather than teleporting above them. The existing red-warning dodge and HP emergency retreat are still allowed to reposition instantly for survival. Walking is slower, especially against moving bosses.
+- Auto buy: Backpack ONLY at Station_Backpack when cash >=90; server confirmation Up_GearBackpack > 0. No Axe/upgrade/endless purchases.
+- Boss Jack: handled by existing MOB KILL scheduler. PumpkinHead: activated only when PumpkinChop ScreenGui.Enabled.
+- Claws: recognize Tool=Claws, slot 3, use real observed equipment.
+- Clawman Attack Speed max => tree-only rush. Gate: Up_ClawsSpeed >=6 OR corresponding 'Attack Speed' card price UI shows MAX/MAXED. No pickup/sell ONLY while gate true. Under max: existing pickup/sell pipeline. No guessing or buying speed levels.
+- Independent FARM and MOBS buttons; Walk and Instant TP retained.
+- Boss egg drops: not auto-collected until separate Egg Logger validates object and mechanism.
 
-Everything else is unchanged: AUTO FARM ON/OFF, KILL MOBS ON/OFF, F6 start/stop, F8 emergency stop. No auto-buy Axe/Backpack, upgrades or auto-Endless.
+Load after GitHub commit:
+loadstring(game:HttpGet('https://raw.githubusercontent.com/xFellix-cyfraoryginal/Chop-A-Forest/main/main.lua?v=4.7.8'))()
 
-Loader:
-`loadstring(game:HttpGet("https://raw.githubusercontent.com/xFellix-cyfraoryginal/Chop-A-Forest/main/main.lua?v=4.7.5"))()`
-
-Syntax validated locally. Real in-game movement not tested.
+Test in Roblox; this patch was syntax-checked locally but NOT runtime verified.

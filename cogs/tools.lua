@@ -103,6 +103,9 @@ return function(C)
         end
     end
     function C:activeProfile()
+        if self.toolSlot=='3' and self.player:GetAttribute('OwnsClaws')==true then
+            return 'Claws',self.player.Character and self.player.Character:FindFirstChildOfClass('Tool')
+        end
         local ch=self.player.Character
         local held=ch and ch:FindFirstChildOfClass('Tool')
         local name = held and held.Name:lower() or ''
@@ -114,20 +117,23 @@ return function(C)
             if lower:find('chain') then return 'Chainsaw',held end
             if lower:find('vacuum') then return 'Vacuum',held end
             if lower:find('pistol') then return 'Pistol',held end
+            if lower:find('claw') then return 'Claws',held end
             if lower:find('axe') then return 'Axe',held end
             if lower:find('fist') then return 'Fists',held end
         end
         if name:find('chain') or name:find('saw') then return 'Chainsaw',held end
         if name:find('vacuum') or name:find('vac') then return 'Vacuum',held end
         if name:find('pistol') or name:find('gun') then return 'Pistol',held end
+        if name:find('claw') then return 'Claws',held end
         if name:find('fist') then return 'Fists',held end
+        if self.toolSlot == '3' and self.player:GetAttribute('OwnsClaws')==true then return 'Claws',held end
         if self.toolSlot == '1' then return 'Fists',held end
         return 'Axe',held
     end
     function C:pressSlot(slot)
         if not slot then return false end
         if self.toolSlot == tostring(slot) then return true end
-        local code=slot==1 and Enum.KeyCode.One or Enum.KeyCode.Two
+        local code=slot==1 and Enum.KeyCode.One or slot==3 and Enum.KeyCode.Three or Enum.KeyCode.Two
         local vim = getVIM()
         if vim then
             local ok=pcall(function()
@@ -148,6 +154,10 @@ return function(C)
         local base=profile=='Fists' and .50 or profile=='Pistol' and .34 or .58
         if profile=='Axe' then base=self.axeDelay or .33 end
         if profile=='Chainsaw' or profile=='Vacuum' then base=.54 end
+        if profile=='Claws' then
+            local lv=tonumber(self.player:GetAttribute('Up_ClawsSpeed')) or 0
+            base=math.max(.17,.53-.045*lv)
+        end
         if held then
             for _,key in ipairs({'AttackCooldown','SwingCooldown','Cooldown','AttackDelay'}) do
                 local num=held:GetAttribute(key)
@@ -172,8 +182,7 @@ return function(C)
         if purpose~='Combat' and self:mobInterrupt() then
             return false,'Mob spawned; interrupting farm'
         end
-        -- E picks up logs without swinging the equipped axe. Do not
-        -- change tool slots or aim the camera when collecting.
+        -- E picks up without weapon swings.
         if purpose=='Pickup' then
             local now=os.clock()
             local nextAt=math.max(self.pickupKeyAt or 0,self.lastInputAt or 0)
@@ -189,7 +198,13 @@ return function(C)
             return sent, sent and nil or 'Executor did not accept E input'
         end
         local profile, held = self:activeProfile()
-        -- In Auto, prefer the verified Axe for tree work, pickup and melee.
+        if self.cfg.tool=='Auto' and purpose=='Tree'
+            and self.clawSpeedMax and self:clawSpeedMax() then
+            if profile~='Claws' then
+                self:pressSlot(3)
+                profile,held=self:activeProfile()
+            end
+        end
         if self.cfg.tool=='Auto' then
             local needsAxe=((purpose=='PickupClick' or purpose=='Deposit') and profile~='Axe')
                 or (purpose=='Tree' and (profile=='Fists' or profile=='Pistol'
@@ -213,7 +228,6 @@ return function(C)
                 return false,'Axe not equipped; experimental tool remains OFF'
             end
         end
-        -- Unsupported equipment uses experimental generic input only when opted in.
         if purpose=='Tree' and (profile=='Pistol' or profile=='Vacuum') then
             return false, 'Incompatible tool for tree'
         end
@@ -237,8 +251,8 @@ return function(C)
             return false, 'Equip the selected tool in game first'
         end
         if profile=='Axe' then self:pressSlot(2)
+        elseif profile=='Claws' then self:pressSlot(3)
         elseif profile=='Fists' then self:pressSlot(1) end
-        -- Resolve moving targets only after cooldown; never aim at an old Vector3.
         local key=profile
         local now=os.clock()
         local waitUntil=math.max(self.toolAt[key] or 0,self.lastInputAt or 0)
@@ -282,4 +296,5 @@ return function(C)
         end
         return worked
     end
+
 end

@@ -20,6 +20,7 @@ return function(C)
             and self.cfg.priority=='ATTACK' and self.cfg.combat
             and not self.stage:find('COMBAT',1,true)
             and self:pickSkeleton() then return false end
+        if not escape and not self.postBossAction and self:mobInterrupt() then return false end
         if not escape and self.isDodging and self:isDodging() then return false end
         if (self:isPaused() or (self:urgentCombat() and not self.stage:find('COMBAT',1,true)))
             and not escape then return false end
@@ -33,6 +34,7 @@ return function(C)
                 and (escape or self.shopping or self.postBossAction
                     or self.starterFarming or self.cfg.priority~='ATTACK' or not self.cfg.combat
                     or self.stage:find('COMBAT',1,true) or not self:pickSkeleton())
+                and (escape or self.shopping or self.postBossAction or not self:mobInterrupt())
                 and (escape or (not (self.isDodging and self:isDodging())
                     and not self:isPaused()
                     and (not self:urgentCombat() or self.stage:find('COMBAT',1,true))))

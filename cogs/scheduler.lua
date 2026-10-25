@@ -1,4 +1,4 @@
--- FARM + MOBS ONLY V4.7.4. Never opens purchase/upgrade/endless UI.
+-- V4.7.8: MOB interrupts + backpack only + pumpkin; Claws MAX tree rush.
 return function(C)
     C.eventSeen, C.eventPending = {}, {}
     function C:pendingEventMob()
@@ -51,8 +51,9 @@ return function(C)
             self.stage='DODGE: warning active'
             task.wait(.06); return
         end
-        -- No shop, upgrades, starter buying or round/endless automation.
-        -- Kill a newly spawned/initial mob, then resume the wood pipeline.
+        -- Finish boss pumpkin before resuming normal combat/tree work.
+        if self.cfg.combat and self.postBossStep and self:postBossStep() then return end
+        -- Mob priority remains skeleton -> pumpkinling -> guardian.
         if self.cfg.combat then
             local mob=self:pendingEventMob()
             if mob then
@@ -72,6 +73,21 @@ return function(C)
             task.wait(.20)
             return
         end
+        -- Only explicit MAX in the Clawman Attack Speed card (or lv 6)
+        -- switches to TREE RUSH. Never collect/sell in this mode.
+        if self.clawSpeedMax and self:clawSpeedMax() then
+            local tree=self:chooseTree()
+            if tree then
+                self.stage='TREE RUSH: claws MAX (no pickup/sell)'
+                self:chopTree(tree)
+            else
+                self.stage='TREE RUSH: waiting for trees'
+                task.wait(.2)
+            end
+            return
+        end
+        -- While levelling, backpack purchase is the ONLY auto purchase.
+        if self.buyBackpackStep and self:buyBackpackStep() then return end
         local bag,cap=self:backpack()
         if bag==nil then
             self.stage='WAIT: backpack HUD'; task.wait(.3); return
@@ -141,7 +157,7 @@ return function(C)
         self.eventSeen,self.eventPending={},{}
         local session=self.session
         self.stage='STARTING'
-        self:note('V4.7.4 FARM/MOBS: farm='..tostring(self.cfg.farm)
+        self:note('V4.7.8 FARM/MOBS: farm='..tostring(self.cfg.farm)
             ..', kill='..tostring(self.cfg.combat))
         task.spawn(function() self:watchSafety(session) end)
         task.spawn(function() self:workLoop(session) end)
