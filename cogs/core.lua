@@ -15,14 +15,13 @@ return function(C)
     C.connections, C.messages = {}, {}
     C.stats = {trees = 0, collected = 0, sold = 0, kills = 0, retreats = 0}
     C.cfg = {
-        move = 'Instant TP', priority = 'FARM', tool = 'Auto',
-        combat = true, collect = true, sell = true,
+        move = 'Instant TP', priority = 'EVENT', tool = 'Auto',
+        farm = true, combat = true, collect = true, sell = true,
         hpPause = true, pauseHP = 0.40, pauseSeconds = 6,
         retaliateSeconds = 9, clearUntil = 1, combatRadius = 65,
         pickupRange = 3.7, treeRange = 3.7,
         maxTreeDistance = math.huge, idlePause = .15,
-        useExperimental = false, autoBuy = true,
-        autoEndless = true
+        useExperimental = false
     }
     C.toolAt, C.toolSlot = {}, ''
     function C:connect(signal, callback)
@@ -125,7 +124,7 @@ return function(C)
         end
         self.skyHoldPosition,self.skyLanding=nil,nil
         self.stage = 'STOPPED'
-        self:note('Stopped (F8 / button)')
+        self:note('Stopped (F6/F8 / button)')
     end
     function C:unload()
         if not self.live then return end
@@ -142,6 +141,9 @@ return function(C)
     end
     C:connect(C.uis.InputBegan, function(input, consumed)
         if input.KeyCode == Enum.KeyCode.F8 then C:stop() end
+        if input.KeyCode == Enum.KeyCode.F6 and not consumed then
+            if C.running then C:stop() elseif C.start then C:start() end
+        end
         if consumed then return end
         if input.KeyCode == Enum.KeyCode.One then C.toolSlot = '1' end
         if input.KeyCode == Enum.KeyCode.Two then C.toolSlot = '2' end

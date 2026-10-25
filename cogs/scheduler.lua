@@ -1,5 +1,47 @@
--- V4.4: pending wood is harvested in a pipeline; sale dwell is synchronized.
+-- FARM + MOBS ONLY V4.7.4. Never opens purchase/upgrade/endless UI.
 return function(C)
+    C.eventSeen, C.eventPending = {}, {}
+    function C:pendingEventMob()
+        local chosenSkeleton,chosenPumpkin,chosenBoss=nil,nil,nil
+        local skDist,pumpDist,bossDist=math.huge,math.huge,math.huge
+        local pos=self:position()
+        if not pos then return nil end
+        for mob in pairs(self.enemies) do
+            if not self.eventSeen[mob] and self:enemyValid(mob) then
+                if self:isSkeleton(mob) or self:isPumpkinEnemy(mob)
+                    or mob:GetAttribute('Monster')=='Guardian' then
+                    self.eventSeen[mob]=true
+                    self.eventPending[mob]=true
+                end
+            end
+            if self.eventPending[mob] then
+                if not self:enemyValid(mob) then
+                    self.eventPending[mob]=nil
+                elseif os.clock()>=(self.enemyRetry[mob] or 0) then
+                    local p=self:enemyPosition(mob)
+                    local d=p and (p-pos).Magnitude or math.huge
+                    if self:isSkeleton(mob) and d<skDist then
+                        chosenSkeleton,skDist=mob,d
+                    elseif self:isPumpkinEnemy(mob) and d<pumpDist then
+                        chosenPumpkin,pumpDist=mob,d
+                    elseif mob:GetAttribute('Monster')=='Guardian' and d<bossDist then
+                        chosenBoss,bossDist=mob,d
+                    end
+                end
+            end
+        end
+        for mob in pairs(self.eventPending) do
+            if not mob.Parent or not self:enemyValid(mob) then
+                self.eventPending[mob]=nil
+            end
+        end
+        return chosenSkeleton or chosenPumpkin or chosenBoss
+    end
+    function C:mobInterrupt()
+        if not self.running or not self.cfg.combat
+            or tostring(self.stage):find('COMBAT',1,true) then return false end
+        return self:pendingEventMob()~=nil
+    end
     function C:workStep()
         if self:isPaused() then
             self.stage='HP PAUSE: '..math.max(0,math.ceil(self.hpHoldUntil-os.clock()))..'s'
@@ -9,52 +51,33 @@ return function(C)
             self.stage='DODGE: warning active'
             task.wait(.06); return
         end
-        if self:postBossStep() then return end
+        -- No shop, upgrades, starter buying or round/endless automation.
+        -- Kill a newly spawned/initial mob, then resume the wood pipeline.
+        if self.cfg.combat then
+            local mob=self:pendingEventMob()
+            if mob then
+                if self:isSkeleton(mob) then
+                    self.stage='MOBS: skeleton first'
+                elseif self:isPumpkinEnemy(mob) then
+                    self.stage='MOBS: pumpkinling next'
+                else
+                    self.stage='MOBS: boss'
+                end
+                self:fight(mob)
+                return
+            end
+        end
+        if not self.cfg.farm then
+            self.stage=self.cfg.combat and 'MOBS: waiting for spawn' or 'IDLE: both OFF'
+            task.wait(.20)
+            return
+        end
         local bag,cap=self:backpack()
-        local axe,boughtBag=self:equipmentStatus()
-        local setup=not axe or not boughtBag
-        self.starterFarming=setup
-        if setup and self.cfg.autoBuy then
-            if self:starterStep() then return end
-        end
         if bag==nil then
-            self.stage='WAIT: backpack HUD'; task.wait(.45); return
-        end
-        if not setup and self.cfg.priority=='ATTACK' and self.cfg.combat then
-            -- Strict order across the entire loaded map: skeletons first,
-            -- pumpkin mobs second, then resume collecting/chopping.
-            -- A retry cooldown on one target never blocks the other class.
-            local skeleton=self:pickSkeleton()
-            if skeleton then
-                self.stage='EVENT: skeletons first'
-                self:fight(skeleton)
-                return
-            end
-            local pumpkin=self:pickPumpkin()
-            if pumpkin then
-                self.stage='EVENT: clearing pumpkin mobs'
-                self:fight(pumpkin)
-                return
-            end
-            self.stage='EVENT: mobs cleared; farming trees'
-        end
-        -- FARM FIRST continues to defend itself only when hurt.
-        if self.cfg.priority~='ATTACK' and self:urgentCombat() then
-            local enemy=self:pickEnemy(18)
-            if enemy then self:fight(enemy); return end
+            self.stage='WAIT: backpack HUD'; task.wait(.3); return
         end
         if self.cfg.sell and cap and bag>=cap then
             if not self:sellBag() then task.wait(.25) end
-            return
-        end
-        -- Right after an HP retreat, briefly prioritize a safe tree over
-        -- dangerous old pickup locations. The wood registry stays intact.
-        local hp,maxHP=self:health()
-        if self.cfg.priority=='FARM' and hp/math.max(maxHP,1)<.66
-            and self.safeTree and os.clock()<(self.safeTreeUntil or 0)
-            and self:treeValid(self.safeTree) then
-            self.stage='TREE: quiet-area recovery'
-            self:chopTree(self.safeTree)
             return
         end
         local wood,ready=self:woodCounts()
@@ -110,18 +133,16 @@ return function(C)
         if not self.treesFolder or not self.logsFolder then
             self:note('Missing Workspace.Map.Trees or Workspace.Logs'); return
         end
-        local axe,boughtBag=self:equipmentStatus()
-        if not axe or not boughtBag then
-            self:note('Starter mode: farm hands -> Backpack $90 -> Axe $75')
-        end
         self.running=true; self.session=self.session+1
         self.panic=false; self.lastHP=nil
         self.hpHoldUntil=0; self.retaliateUntil=0; self.pendingHold=false
         self.lastHoldAt=-100; self.skyHoldPosition=nil; self.skyLanding=nil
         self.safeTree=nil; self.safeTreeUntil=0
+        self.eventSeen,self.eventPending={},{}
         local session=self.session
         self.stage='STARTING'
-        self:note('V4.7.2 SKELETON THEN PUMPKIN '..self.cfg.priority..' / '..self.cfg.move)
+        self:note('V4.7.4 FARM/MOBS: farm='..tostring(self.cfg.farm)
+            ..', kill='..tostring(self.cfg.combat))
         task.spawn(function() self:watchSafety(session) end)
         task.spawn(function() self:workLoop(session) end)
     end

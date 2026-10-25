@@ -26,7 +26,7 @@ return function(C)
     C:connect(rs.Heartbeat,function()
         local enemy=C.followTarget
         if not enemy then return end
-        if not C.live or not C.running or C:isPaused() or not C:enemyValid(enemy) then
+        if not C.live or not C.running or not C.cfg.combat or C:isPaused() or not C:enemyValid(enemy) then
             C:stopHover(); return
         end
         if C.isDodging and C:isDodging() then return end
@@ -46,7 +46,7 @@ return function(C)
     -- Tool useItem also resolves the point again immediately before a click.
     C:connect(rs.RenderStepped,function()
         local enemy=C.followTarget
-        if not enemy or not C.running or (C.isDodging and C:isDodging()) then return end
+        if not enemy or not C.running or not C.cfg.combat or (C.isDodging and C:isDodging()) then return end
         local at=C:enemyPosition(enemy)
         if at then C:aimAt(at+Vector3.new(0,.55,0)) end
     end)
@@ -149,14 +149,14 @@ return function(C)
         return best
     end
     function C:fight(enemy)
-        if not self:enemyValid(enemy) or self:isPaused() then return false end
+        if not self.cfg.combat or not self:enemyValid(enemy) or self:isPaused() then return false end
         self.stage='COMBAT: tracking live target'
         self:cancelMove()
         if not self:startHover(enemy) then return false end
         local misses,shots=0,0
         local lastHP=enemy:GetAttribute('HP')
         local deadline=os.clock()+24
-        while self.running and not self:isPaused() and self:enemyValid(enemy)
+        while self.running and self.cfg.combat and not self:isPaused() and self:enemyValid(enemy)
             and shots<40 and os.clock()<deadline do
             if self.cfg.priority=='FARM' and not self:urgentCombat() then break end
             if self.isDodging and self:isDodging() then
@@ -176,7 +176,7 @@ return function(C)
             shots=shots+1
             local confirmed=false
             local untilAt=os.clock()+.65
-            while self.running and not self:isPaused() and os.clock()<untilAt do
+            while self.running and self.cfg.combat and not self:isPaused() and os.clock()<untilAt do
                 local after=enemy:GetAttribute('HP')
                 if type(before)=='number' and type(after)=='number' and after<before-.01 then
                     confirmed=true; lastHP=after; break

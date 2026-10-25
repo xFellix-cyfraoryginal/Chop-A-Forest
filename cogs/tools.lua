@@ -166,14 +166,11 @@ return function(C)
     end
     function C:useItem(target, purpose)
         if not self.running or self:isPaused() then return false end
+        if purpose=='Combat' and not self.cfg.combat then return false,'Mob killing disabled' end
+        if purpose~='Combat' and not self.cfg.farm then return false,'Farm disabled' end
         if self.isDodging and self:isDodging() then return false,'Dodging red zone' end
-        if purpose~='Combat' and not self.starterFarming
-            and self.cfg.priority=='ATTACK'
-            and self.cfg.combat and self:pickSkeleton() then
-            return false,'Skeleton spawned; switching priority'
-        end
-        if purpose~='Combat' and self.cfg.priority~='ATTACK' and self:urgentCombat() then
-            return false,'Retaliating against mob'
+        if purpose~='Combat' and self:mobInterrupt() then
+            return false,'Mob spawned; interrupting farm'
         end
         -- E picks up logs without swinging the equipped axe. Do not
         -- change tool slots or aim the camera when collecting.
@@ -249,6 +246,10 @@ return function(C)
             task.wait(math.min(.08,waitUntil-now)); now=os.clock()
         end
         if not self.running or self:isPaused() then return false end
+        if purpose=='Combat' and not self.cfg.combat then return false,'Mob killing disabled' end
+        if purpose~='Combat' and (not self.cfg.farm or self:mobInterrupt()) then
+            return false,'Farm disabled or mob appeared'
+        end
         if self.isDodging and self:isDodging() then return false,'Dodging red zone' end
         local aimPoint=target
         if type(target)=='function' then

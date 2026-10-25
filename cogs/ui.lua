@@ -1,170 +1,88 @@
+-- V4.7.4: one compact panel; farm and combat toggles only.
 return function(C)
-    local function make(class, props, parent)
-        local item=Instance.new(class)
-        for key,val in pairs(props) do item[key]=val end
-        item.Parent=parent
-        return item
+    local function make(class,props,parent)
+        local obj=Instance.new(class)
+        for k,v in pairs(props) do obj[k]=v end
+        obj.Parent=parent
+        return obj
     end
-    local function round(frame,radius)
-        make('UICorner',{CornerRadius=UDim.new(0,radius or 8)},frame)
-        return frame
+    local function round(obj,r)
+        make('UICorner',{CornerRadius=UDim.new(0,r or 8)},obj)
+        return obj
     end
-    local ink=Color3.fromRGB(234,240,250)
-    local muted=Color3.fromRGB(158,173,194)
-    local bg=Color3.fromRGB(15,20,31)
-    local surface=Color3.fromRGB(31,40,57)
-    local blue=Color3.fromRGB(66,135,240)
-    local red=Color3.fromRGB(204,79,89)
-    local green=Color3.fromRGB(38,163,119)
+    local white=Color3.fromRGB(239,243,251)
+    local muted=Color3.fromRGB(164,178,199)
+    local dark=Color3.fromRGB(15,20,31)
+    local surface=Color3.fromRGB(34,44,62)
+    local green=Color3.fromRGB(35,159,113)
+    local red=Color3.fromRGB(202,75,90)
     local parent=game:GetService('CoreGui')
     if type(gethui)=='function' then
-        local ok,custom=pcall(gethui)
-        if ok and custom then parent=custom end
+        local ok,hui=pcall(gethui)
+        if ok and hui then parent=hui end
     end
-    local gui=make('ScreenGui',{Name='CAF_Telegraph_V4_5',ResetOnSpawn=false,
+    local gui=make('ScreenGui',{Name='CAF_FarmMobs_V4_7_4',ResetOnSpawn=false,
         IgnoreGuiInset=true,ZIndexBehavior=Enum.ZIndexBehavior.Sibling},parent)
     C.gui=gui
-    local panel=round(make('Frame',{Size=UDim2.fromOffset(394,382),
-        Position=UDim2.fromOffset(26,112),BackgroundColor3=bg,BorderSizePixel=0},gui),12)
-    make('UIStroke',{Color=Color3.fromRGB(65,78,99),Thickness=1},panel)
-    local top=round(make('Frame',{Size=UDim2.new(1,0,0,48),
-        BackgroundColor3=surface,BorderSizePixel=0},panel),12)
-    make('TextLabel',{Size=UDim2.new(1,-92,1,0),Position=UDim2.fromOffset(13,0),
-        BackgroundTransparency=1,Text='CHOP A FOREST / EVENT COMBAT V4.7.2',TextSize=14,
-        Font=Enum.Font.GothamBold,TextColor3=ink,TextXAlignment=Enum.TextXAlignment.Left},top)
-    local function button(parent,text,y,height,color,clicked)
-        local b=round(make('TextButton',{Size=UDim2.new(1,-20,0,height or 37),
-            Position=UDim2.fromOffset(10,y or 0),BackgroundColor3=color or surface,
-            BorderSizePixel=0,Font=Enum.Font.GothamSemibold,TextSize=13,
-            TextColor3=ink,Text=text,AutoButtonColor=true},parent),8)
-        C:connect(b.MouseButton1Click,clicked)
-        return b
+    local panel=round(make('Frame',{Size=UDim2.fromOffset(344,273),
+        Position=UDim2.fromOffset(24,112),BackgroundColor3=dark,BorderSizePixel=0},gui),11)
+    make('UIStroke',{Color=Color3.fromRGB(68,83,106),Thickness=1},panel)
+    local head=round(make('Frame',{Size=UDim2.new(1,0,0,44),
+        BackgroundColor3=surface,BorderSizePixel=0},panel),11)
+    make('TextLabel',{Position=UDim2.fromOffset(12,0),Size=UDim2.new(1,-86,1,0),
+        Text='CHOP A FOREST  |  FARM + MOBS',BackgroundTransparency=1,
+        TextColor3=white,TextSize=13,Font=Enum.Font.GothamBold,
+        TextXAlignment=Enum.TextXAlignment.Left},head)
+    local function action(parent,text,y,height,color,click,x,width)
+        local btn=round(make('TextButton',{Position=UDim2.fromOffset(x or 10,y),
+            Size=UDim2.fromOffset(width or 324,height),Text=text,BackgroundColor3=color,
+            TextColor3=white,TextSize=14,Font=Enum.Font.GothamBold,
+            BorderSizePixel=0,AutoButtonColor=true},parent),8)
+        C:connect(btn.MouseButton1Click,click)
+        return btn
     end
-    local close=round(make('TextButton',{Size=UDim2.fromOffset(30,29),
-        Position=UDim2.fromOffset(355,9),Text='X',Font=Enum.Font.GothamBold,
-        TextSize=12,TextColor3=ink,BackgroundColor3=red,BorderSizePixel=0},top),6)
-    C:connect(close.MouseButton1Click,function() C:unload() end)
-    local min=round(make('TextButton',{Size=UDim2.fromOffset(30,29),
-        Position=UDim2.fromOffset(320,9),Text='_',Font=Enum.Font.GothamBold,
-        TextSize=12,TextColor3=ink,BackgroundColor3=bg,BorderSizePixel=0},top),6)
+    action(head,'X',7,29,red,function() C:unload() end,308,28)
     local collapsed=false
-    local content=make('Frame',{Position=UDim2.fromOffset(0,48),
-        Size=UDim2.new(1,0,1,-48),BackgroundTransparency=1},panel)
-    C:connect(min.MouseButton1Click,function()
+    local body=make('Frame',{Position=UDim2.fromOffset(0,44),
+        Size=UDim2.new(1,0,1,-44),BackgroundTransparency=1},panel)
+    action(head,'_',7,29,dark,function()
         collapsed=not collapsed
-        panel.Size=UDim2.fromOffset(394,collapsed and 48 or 382)
-        content.Visible=not collapsed
-    end)
-    local bar=make('Frame',{Position=UDim2.fromOffset(10,8),
-        Size=UDim2.new(1,-20,0,32),BackgroundTransparency=1},content)
-    local pages, tabs={},{}
-    for i,name in ipairs({'MAIN','TOOLS','DEBUG'}) do
-        local tab=round(make('TextButton',{Position=UDim2.fromOffset((i-1)*127,0),
-            Size=UDim2.fromOffset(119,30),Text=name,Font=Enum.Font.GothamBold,
-            TextSize=12,TextColor3=ink,BackgroundColor3=surface,BorderSizePixel=0},bar),7)
-        tabs[name]=tab
-        pages[name]=make('Frame',{Position=UDim2.fromOffset(0,49),
-            Size=UDim2.new(1,0,1,-53),BackgroundTransparency=1,Visible=(i==1)},content)
-    end
-    local function select(name)
-        for title,page in pairs(pages) do
-            page.Visible=title==name
-            tabs[title].BackgroundColor3=title==name and blue or surface
-        end
-    end
-    for name,b in pairs(tabs) do
-        C:connect(b.MouseButton1Click,function() select(name) end)
-    end
-    select('MAIN')
-    local function label(page,text,y,size)
-        return make('TextLabel',{Position=UDim2.fromOffset(13,y),Size=UDim2.new(1,-26,0,27),
-            BackgroundTransparency=1,TextXAlignment=Enum.TextXAlignment.Left,
-            Text=text,Font=Enum.Font.Gotham,TextSize=size or 13,
-            TextColor3=muted,TextTruncate=Enum.TextTruncate.AtEnd},page)
-    end
-    local main=pages.MAIN
-    local status=label(main,'Status: Idle',4,14)
-    status.TextColor3=ink
-    local detail=label(main,'Ready',34,12)
-    local bag=label(main,'HP --   |   Bag --   |   Wood --',61,12)
-    local runButton=button(main,'START',96,43,green,function()
+        panel.Size=UDim2.fromOffset(344,collapsed and 44 or 273)
+        body.Visible=not collapsed
+    end,272,28)
+    local taskLabel=make('TextLabel',{Position=UDim2.fromOffset(12,7),
+        Size=UDim2.new(1,-24,0,27),BackgroundTransparency=1,
+        Text='Idle',TextColor3=white,TextSize=12,Font=Enum.Font.Gotham,
+        TextXAlignment=Enum.TextXAlignment.Left,TextTruncate=Enum.TextTruncate.AtEnd},body)
+    local statsLabel=make('TextLabel',{Position=UDim2.fromOffset(12,32),
+        Size=UDim2.new(1,-24,0,24),BackgroundTransparency=1,
+        Text='HP -- | Bag -- | Kills 0',TextColor3=muted,
+        TextSize=12,Font=Enum.Font.Gotham,TextXAlignment=Enum.TextXAlignment.Left},body)
+    local run=action(body,'START  [F6]',67,43,green,function()
         if C.running then C:stop() else C:start() end
     end)
-    local moveBtn=button(main,'Movement: Instant TP',148,35,surface,function() end)
-    C:connect(moveBtn.MouseButton1Click,function()
-        local options={'Walk','Instant TP'}
-        local index=table.find(options,C.cfg.move) or 1
-        C.cfg.move=options[index%#options+1]
-        moveBtn.Text='Movement: '..C.cfg.move
+    local farm=action(body,'AUTO FARM: ON',119,38,surface,function()
+        C.cfg.farm=not C.cfg.farm
+        if not C.cfg.farm then C:cancelMove() end
+        C:note('Auto Farm '..(C.cfg.farm and 'ON' or 'OFF'))
     end)
-    local priorityBtn=button(main,'Priority: FARM FIRST',190,35,surface,function() end)
-    C:connect(priorityBtn.MouseButton1Click,function()
-        C.cfg.priority=C.cfg.priority=='FARM' and 'ATTACK' or 'FARM'
-        priorityBtn.Text='Priority: '..C.cfg.priority..' FIRST'
-        C:note('Priority changed: '..C.cfg.priority..' FIRST (ATTACK = skeletons then pumpkin mobs)')
-    end)
-    label(main,'ATTACK: Skeleton > Pumpkinling  |  F8 STOP',237,12)
-    local tools=pages.TOOLS
-    label(tools,'Auto Buy + Endless ON  |  Auto Upgrade REMOVED',6,12)
-    local profile=button(tools,'Tool: Auto',47,39,surface,function() end)
-    C:connect(profile.MouseButton1Click,function()
-        local items={'Auto','Axe','Fists','Chainsaw','Pistol','Vacuum'}
-        local i=table.find(items,C.cfg.tool) or 1
-        C.cfg.tool=items[i%#items+1]
-        profile.Text='Tool: '..C.cfg.tool
-    end)
-    local combat=button(tools,'Combat: ON',95,37,surface,function() end)
-    C:connect(combat.MouseButton1Click,function()
+    local combat=action(body,'KILL MOBS: ON',165,38,surface,function()
         C.cfg.combat=not C.cfg.combat
-        combat.Text='Combat: '..(C.cfg.combat and 'ON' or 'OFF')
-    end)
-    local exp=button(tools,'Unverified tools: OFF',142,37,surface,function() end)
-    C:connect(exp.MouseButton1Click,function()
-        C.cfg.useExperimental=not C.cfg.useExperimental
-        exp.Text='Unverified tools: '..(C.cfg.useExperimental and 'ON' or 'OFF')
-    end)
-    local holdBtn=button(tools,'HP Retreat: ON (6s at <=40%)',187,34,surface,function() end)
-    C:connect(holdBtn.MouseButton1Click,function()
-        C.cfg.hpPause=not C.cfg.hpPause
-        holdBtn.Text='HP Retreat: '..(C.cfg.hpPause and 'ON' or 'OFF')
-            ..' ('..C.cfg.pauseSeconds..'s at <=40%)'
-    end)
-    local durationBtn=button(tools,'Shelter duration: 6 seconds',227,34,surface,function() end)
-    C:connect(durationBtn.MouseButton1Click,function()
-        local values={4,6,8,10}
-        local i=table.find(values,C.cfg.pauseSeconds) or 2
-        C.cfg.pauseSeconds=values[i%#values+1]
-        durationBtn.Text='Shelter duration: '..C.cfg.pauseSeconds..' seconds'
-        holdBtn.Text='HP Retreat: '..(C.cfg.hpPause and 'ON' or 'OFF')
-            ..' ('..C.cfg.pauseSeconds..'s at <=40%)'
-    end)
-    local debug=pages.DEBUG
-    local debugInfo=label(debug,'Waiting for actions...',6,12)
-    local expBtn=button(debug,'EXPORT DIAGNOSTICS',49,39,blue,function()
-        local records={version=C.version,stage=C.stage,stats=C.stats,
-            messages=C.messages,settings=C.cfg,wood=C:woodCounts(),
-            sales=C.sellAudit or {},dodges=C.stats.dodges,
-            activeWarnings=#(C.hazards or {}),dodgeAudit=C.dodgeAudit or {},
-            running=C.running}
-        local ok,data=pcall(function() return C.http:JSONEncode(records) end)
-        if not ok then C:note('Export failed'); return end
-        if type(writefile)=='function' then
-            local file='CAF_V4_debug_'..os.date('%Y%m%d_%H%M%S')..'.json'
-            if pcall(writefile,file,data) then C:note('Saved '..file); return end
+        if not C.cfg.combat then
+            if C.stopHover then C:stopHover() end
+            -- Don't forget pending mobs; enabling again resumes hunting.
         end
-        if type(setclipboard)=='function' then
-            pcall(setclipboard,data); C:note('Debug JSON copied to clipboard')
-        else C:note('Executor lacks writefile and clipboard') end
+        C:note('Kill Mobs '..(C.cfg.combat and 'ON' or 'OFF'))
     end)
-    local reset=button(debug,'CLEAR DEBUG MESSAGES',98,36,surface,function()
-        C.messages={}; C:note('Messages cleared')
-    end)
-    label(debug,'No network hooks. No external UI library.',151,12)
-    local dragging,dragStart,frameStart=false,nil,nil
-    C:connect(top.InputBegan,function(input)
+    make('TextLabel',{Position=UDim2.fromOffset(12,205),Size=UDim2.new(1,-24,0,22),
+        BackgroundTransparency=1,Text='F6 START/STOP   |   F8 STOP',
+        TextSize=11,TextColor3=muted,Font=Enum.Font.Gotham,
+        TextXAlignment=Enum.TextXAlignment.Left},body)
+    local dragging,dragStart,startPos=false,nil,nil
+    C:connect(head.InputBegan,function(input)
         if input.UserInputType==Enum.UserInputType.MouseButton1 or
             input.UserInputType==Enum.UserInputType.Touch then
-            dragging,dragStart,frameStart=true,input.Position,panel.Position
+            dragging=true;dragStart=input.Position;startPos=panel.Position
         end
     end)
     C:connect(C.uis.InputEnded,function(input)
@@ -175,27 +93,25 @@ return function(C)
         if dragging and (input.UserInputType==Enum.UserInputType.MouseMovement or
             input.UserInputType==Enum.UserInputType.Touch) then
             local delta=input.Position-dragStart
-            panel.Position=UDim2.new(frameStart.X.Scale,frameStart.X.Offset+delta.X,
-                frameStart.Y.Scale,frameStart.Y.Offset+delta.Y)
+            panel.Position=UDim2.new(startPos.X.Scale,startPos.X.Offset+delta.X,
+                startPos.Y.Scale,startPos.Y.Offset+delta.Y)
         end
     end)
     task.spawn(function()
         while C.live and gui.Parent do
-            local hp,cap=C:health()
-            local have,maxBag=C:backpack()
-            local wood=C:woodCounts()
-            status.Text='Task: '..C.stage
-            detail.Text=C.detail
-            bag.Text=string.format('HP %d/%d   |   Bag %s/%s   |   Wood %d',
-                math.floor(hp),math.floor(cap),tostring(have or '-'),
-                tostring(maxBag or '-'),wood)
-            runButton.Text=C.running and 'STOP   [F8]' or 'START'
-            runButton.BackgroundColor3=C.running and red or green
-            local info=C.treeScan or {}
-            local threats=C:threats(C:position(),math.huge)
-            debugInfo.Text=string.format('Trees %d/%d | Skel %d | Pump %d | Dodge %d',
-                info.valid or 0,info.cached or 0,C:skeletonCount(),C:pumpkinCount(),C.stats.dodges or 0)
-            task.wait(.65)
+            local hp,maxHP=C:health()
+            local bag,capacity=C:backpack()
+            taskLabel.Text='Task: '..tostring(C.stage)
+            statsLabel.Text=string.format('HP %d/%d  |  Bag %s/%s  |  Kills %d',
+                math.floor(hp),math.floor(maxHP),tostring(bag or '-'),
+                tostring(capacity or '-'),C.stats.kills or 0)
+            run.Text=C.running and 'STOP  [F6/F8]' or 'START  [F6]'
+            run.BackgroundColor3=C.running and red or green
+            farm.Text='AUTO FARM: '..(C.cfg.farm and 'ON' or 'OFF')
+            farm.BackgroundColor3=C.cfg.farm and green or surface
+            combat.Text='KILL MOBS: '..(C.cfg.combat and 'ON' or 'OFF')
+            combat.BackgroundColor3=C.cfg.combat and green or surface
+            task.wait(.28)
         end
     end)
 end
