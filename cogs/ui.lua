@@ -21,7 +21,7 @@ return function(C)
         local ok,hui=pcall(gethui)
         if ok and hui then parent=hui end
     end
-    local gui=make('ScreenGui',{Name='CAF_FarmMobs_V4_8_6',ResetOnSpawn=false,
+    local gui=make('ScreenGui',{Name='CAF_FarmMobs_V4_8_7',ResetOnSpawn=false,
         IgnoreGuiInset=true,ZIndexBehavior=Enum.ZIndexBehavior.Sibling},parent)
     C.gui=gui
     local panel=round(make('Frame',{Size=UDim2.fromOffset(344,468),
@@ -95,10 +95,10 @@ return function(C)
     local ignorePause=action(body,'IGNORE HP PAUSE: OFF',321,33,surface,function()
         C.cfg.ignoreHPPause=not C.cfg.ignoreHPPause
         if C.cfg.ignoreHPPause then
-            -- Kill a held recovery state immediately. Keep dodge ON.
             C.hpHoldUntil=0
             C.skyHoldPosition,C.skyLanding=nil,nil
         end
+        C:clearBossRushInterrupts()
         C:note('Ignore HP Pause '..(C.cfg.ignoreHPPause and 'ON' or 'OFF'))
     end)
     local bossOnly=action(body,'BOSS ONLY: OFF',361,33,surface,function()
@@ -108,6 +108,7 @@ return function(C)
             and C.followTarget:GetAttribute('Monster')~='Guardian' then
             C:stopHover()
         end
+        C:clearBossRushInterrupts()
         C:note('Boss Only '..(C.cfg.bossOnly and 'ON' or 'OFF'))
     end)
     make('TextLabel',{Position=UDim2.fromOffset(12,398),Size=UDim2.new(1,-24,0,22),

@@ -51,6 +51,7 @@ return function(C)
     end
     function C:isDodging()
         return self.live and self.running and self.cfg.dodge
+            and not self:bossRush()
             and os.clock()<(self.dodgeHoldUntil or 0)
     end
     local function safe(p,now)
@@ -99,7 +100,8 @@ return function(C)
         return best
     end
     function C:dodgeTick()
-        if not self.live or not self.running or not self.cfg.dodge then return end
+        if not self.live or not self.running or not self.cfg.dodge
+            or self:bossRush() then return end
         local now=os.clock()
         prune(now)
         if #self.hazards==0 or now-self.dodgeLastAt<.075 then return end
@@ -144,7 +146,8 @@ return function(C)
         self.stage='DODGE: moving outside red warning'
     end
     function C:trackWarning(action,data)
-        if not self.live or not self.cfg.dodge or type(data)~='table' then return end
+        if not self.live or not self.cfg.dodge or self:bossRush()
+            or type(data)~='table' then return end
         local shape=data.Shape
         if action=='FireTrail' then shape='Line' end
         if action~='Warn' and action~='FireTrail' then return end

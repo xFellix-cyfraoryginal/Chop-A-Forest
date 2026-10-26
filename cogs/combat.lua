@@ -61,8 +61,8 @@ return function(C)
         if boss then
             -- Keep the weapon/crosshair within the enemy's hitbox reach.
             -- Old 3.8-up / 2.1-away orbit caused repeated no-damage swings.
-            local angle=os.clock()*.72 + (C.combatOrbitShift or 0)
-            local r=(C.followHeight>2) and 1.65 or 1.12
+            local angle=os.clock()*(C:bossRush() and .22 or .72) + (C.combatOrbitShift or 0)
+            local r=C:bossRush() and .68 or (C.followHeight>2) and 1.65 or 1.12
             goal=at+Vector3.new(math.cos(angle)*r,C.followHeight,
                 math.sin(angle)*r)
             C.stage='BOSS: close air follow + attacking'
@@ -80,24 +80,8 @@ return function(C)
         local enemy=C.followTarget
         if not enemy or not C.running or not C.cfg.combat or (C.isDodging and C:isDodging()) then return end
         local at=C:enemyPosition(enemy)
-        if at then C:aimAt(C:combatAimPoint(enemy) or (at+Vector3.new(0,.55,0))) end
+        if at then C:aimAt(at+Vector3.new(0,.55,0)) end
     end)
-    -- Prefer actual replicated body/hitbox parts over the model pivot.
-    -- Decorative outer models can put GetPivot far from the hittable body.
-    function C:combatAimPoint(enemy)
-        if not enemy or not enemy.Parent then return nil end
-        local selected=nil
-        for _,name in ipairs({'Hitbox','HitBox','DamageHitbox','Body','HumanoidRootPart','Root','Torso'}) do
-            local node=enemy:FindFirstChild(name,true)
-            if node and node:IsA('BasePart') then selected=node; break end
-        end
-        selected=selected or enemy.PrimaryPart
-        if selected and selected:IsA('BasePart') then
-            return selected.Position+Vector3.new(0,math.clamp(selected.Size.Y*.08,0,.4),0)
-        end
-        local pivot=self:enemyPosition(enemy)
-        return pivot and pivot+Vector3.new(0,.5,0) or nil
-    end
     function C:pickEnemy(radius,ignoreBoss)
         if not self.cfg.combat then return nil end
         local from=self:position()
@@ -213,10 +197,18 @@ return function(C)
         local misses,shots=0,0
         local lastHP=enemy:GetAttribute('HP')
         local boss=enemy:GetAttribute('Monster')=='Guardian'
-        if boss then self.bossLock=enemy end
-        local deadline=os.clock()+(self.cfg.move=='Walk' and 55 or 42)
+        if boss then
+            self.bossLock=enemy
+            if self:bossRush() then
+                self:clearBossRushInterrupts()
+                self.followHeight=1.55
+                self.combatFastScale=math.min(self.combatFastScale or 1,.90)
+            end
+        end
+        local deadline=os.clock()+(boss and self:bossRush() and 120
+            or self.cfg.move=='Walk' and 55 or 42)
         while self.running and self.cfg.combat and not self:isPaused() and self:enemyValid(enemy)
-            and shots<(boss and 250 or 65) and os.clock()<deadline do
+            and shots<(boss and 500 or 65) and os.clock()<deadline do
             if self.cfg.bossOnly and not boss then break end
             if not boss then
                 local guardian=self:pickBoss()
@@ -227,7 +219,8 @@ return function(C)
                     break
                 end
             end
-            if self.cfg.priority=='FARM' and not self:urgentCombat() then break end
+            if self.cfg.priority=='FARM' and not self:urgentCombat()
+                and not (boss and self:bossRush()) then break end
             if self.isDodging and self:isDodging() then
                 task.wait(.05)
             else
@@ -247,8 +240,11 @@ return function(C)
             -- BEFORE input. Heartbeat independently follows its movement.
             local before=enemy:GetAttribute('HP')
             local ok,why=self:useItem(function()
-                -- Live sampled part, not stale model pivot coordinates.
-                return self:combatAimPoint(enemy)
+                -- Restore V4.8.5: the guardian's MODEL pivot was the
+                -- previously used melee aim. Decorative Hitbox/Body may
+                -- point to non-damage parts and cause repeated misses.
+                local p=self:enemyPosition(enemy)
+                return p and (p+Vector3.new(0,.35,0)) or nil
             end,'Combat')
             if not ok then
                 if self.isDodging and self:isDodging() then
@@ -261,7 +257,7 @@ return function(C)
             else
             shots=shots+1
             local confirmed=false
-            local untilAt=os.clock()+(boss and .21 or .20)
+            local untilAt=os.clock()+(boss and .42 or .20)
             while self.running and self.cfg.combat and not self:isPaused() and os.clock()<untilAt do
                 local after=enemy:GetAttribute('HP')
                 if type(before)=='number' and type(after)=='number' and after<before-.01 then
@@ -279,12 +275,19 @@ return function(C)
             else
                 self.combatFastScale=math.min(1.15,(self.combatFastScale or 1)+.055)
                 misses=misses+1
-                -- Move THROUGH close hitbox sectors, not higher above Jack.
-                self.followHeight=misses%2==0 and 1.10 or 1.85
-                self.combatOrbitShift=(self.combatOrbitShift or 0)+.85
+                -- Boss Rush: keep V4.8.5 close orbit, not taller or farther.
+                -- Recenter only after a series of unconfirmed hits.
+                if not (boss and self:bossRush()) then
+                    self.followHeight=misses%2==0 and 1.10 or 1.85
+                    self.combatOrbitShift=(self.combatOrbitShift or 0)+.85
+                elseif misses%6==0 then
+                    self.combatOrbitShift=(self.combatOrbitShift or 0)+.35
+                    self.followHeight=1.55
+                end
                 if misses>=4 then
                     self:note('Combat no HP delta: adjusting close hitbox')
-                    if not boss and misses>=6 or boss and misses>=16 then break end
+                    if (not boss and misses>=6)
+                        or (boss and not self:bossRush() and misses>=16) then break end
                 end
             end
             end -- successful input
@@ -305,7 +308,8 @@ return function(C)
             self:note('Monster defeated (HP confirmed)')
             return true
         end
-        self.enemyRetry[enemy]=os.clock()+(boss and .35 or math.min(7,2+misses))
+        self.enemyRetry[enemy]=os.clock()+(boss and (self:bossRush() and .05 or .35)
+            or math.min(7,2+misses))
         return false
     end
 end

@@ -27,6 +27,7 @@ return function(C)
     function C:isRiskPos(_) return false end
     function C:isPaused()
         return self.cfg.hpPause and not self.cfg.ignoreHPPause
+            and not self:bossRush()
             and os.clock() < self.hpHoldUntil
     end
     function C:urgentCombat()
@@ -88,7 +89,8 @@ return function(C)
     end
 
     function C:beginHPHold(hp)
-        if not self.running or not self.cfg.hpPause or self.cfg.ignoreHPPause then return end
+        if not self.running or not self.cfg.hpPause or self.cfg.ignoreHPPause
+            or self:bossRush() then return end
         local now = os.clock()
         if self:isPaused() or now-self.lastHoldAt < self.cfg.pauseSeconds+3 then return end
         self:cancelMove() -- Cancels previous chase/tree/navigation immediately.
@@ -154,6 +156,7 @@ return function(C)
                 self.retaliateUntil=now+self.cfg.retaliateSeconds
                 local mobCount=self:threats(self:position(),18)
                 if mobCount>0 and self.cfg.priority~='ATTACK' and not self:isPaused()
+                    and not self:bossRush()
                     and not self.stage:find('COMBAT',1,true) then
                     self:cancelMove()
                 end
@@ -167,7 +170,7 @@ return function(C)
                 end
             end
             -- Never wait for monsters to leave before retreating.
-            if self.cfg.hpPause and not self.cfg.ignoreHPPause
+            if self.cfg.hpPause and not self.cfg.ignoreHPPause and not self:bossRush()
                 and hp>0 and fraction<=self.cfg.pauseHP then
                 self:beginHPHold(hp)
             end

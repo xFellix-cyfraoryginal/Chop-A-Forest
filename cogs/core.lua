@@ -25,6 +25,19 @@ return function(C)
         maxTreeDistance = math.huge, idlePause = .15,
         useExperimental = false
     }
+    -- Both UI toggles are required to enter the no-dodge boss rush.
+    function C:bossRush()
+        return self.cfg.combat and self.cfg.bossOnly and self.cfg.ignoreHPPause
+    end
+    function C:clearBossRushInterrupts()
+        if not self:bossRush() then return end
+        self.hpHoldUntil=0
+        self.skyHoldPosition=nil
+        self.skyLanding=nil
+        self.dodgeHoldUntil=0
+        if self.hazards then table.clear(self.hazards) end
+        if self.releaseMouse then self:releaseMouse() end
+    end
     C.toolAt, C.toolSlot = {}, ''
     function C:connect(signal, callback)
         local conn = signal:Connect(callback)
