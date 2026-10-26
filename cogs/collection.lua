@@ -88,7 +88,8 @@ return function(C)
         self:note('Pickup failed; wood remains in queue')
         return false
     end
-    -- V4.8.4: Restore the original V4.8.0 long-dwell DepositPad routine.
+    -- V4.8.6: Fast credited sale. 9s fallback if server cash is late.
+    -- Never accept the bag HUD going 0 without payment confirmation.
     -- Full 9 seconds minimum, up to 13.5 seconds for delayed settlement.
     -- If the bag does not start draining after 2.1 seconds, click the pad ONCE.
     -- Leave pickup locked on failed/uncertain sales, never trust a transient 0/30.
@@ -159,8 +160,10 @@ return function(C)
         local firstZero=nil
         local lowest=sale.before
         local clicked=false
-        local cashStart=readCash(self)
+        local cashStart=sale.cash or readCash(self)
+        local earnedStart=sale.earned or readEarned(self)
         local lastCash,lastCashAt=cashStart,started
+        local creditedAt=nil
         local lastCenter=started
         local standPos=self:ground(point) or (point+Vector3.new(0,3.15,0))
         local function finish(status,after,cash)
@@ -170,16 +173,17 @@ return function(C)
                 bagAfter=after,cashBefore=sale.cash,cashAfter=cash,
                 earnedBefore=sale.earned,earnedAfter=readEarned(self),
                 seconds=math.floor((os.clock()-started)*10+.5)/10,
+                credited=(creditedAt~=nil),
                 visits=sale.visits,clicked=clicked}
             if #audit>20 then table.remove(audit,1) end
             self.stats.sold=self.stats.sold+sale.before
             self.salePending=nil
-            self.pickupUnblockAt=os.clock()+.5
-            self:note('SELL: 9s collector settled '..tostring(sale.before)
+            self.pickupUnblockAt=os.clock()+.85
+            self:note('SELL: credited/fallback settled '..tostring(sale.before)
                 ..' logs ('..status..')')
             return true
         end
-        self.stage='SELL: original 9s dwell (max 13.5s)'
+        self.stage='SELL: money confirmation / 9s fallback'
         while self.running and self.live and not self:isPaused()
             and not self:urgentCombat() and pad.Parent and os.clock()<deadline do
             local tick=os.clock()
@@ -209,6 +213,14 @@ return function(C)
                 lastCashAt=tick
                 lastCash=cash
             end
+            -- Server-side wallet growth + the EMPTY bag together provide
+            -- a stronger acknowledgement than a transient 0/30 on the HUD.
+            local earned=readEarned(self)
+            local gainedCash=cashStart~=nil and cash~=nil and cash>cashStart
+            local gainedEarned=earnedStart~=nil and earned~=nil and earned>earnedStart
+            if not creditedAt and (gainedCash or gainedEarned) then
+                creditedAt=tick
+            end
             -- Restored V4.8.0 fallback, also fixes 0->full HUD flicker.
             -- Recheck CURRENT count, not the lowest historical count.
             -- No click while carrying logs IN HANDS: LMB could throw them.
@@ -223,6 +235,11 @@ return function(C)
                     self:note('SELL: keeping held wood safe; pad touch only')
                 end
                 self.stage='SELL: original 9s dwell (max 13.5s)'
+            end
+            if after==0 and firstZero and creditedAt
+                and tick-started>=2.8 and tick-firstZero>=1.05
+                and tick-creditedAt>=.35 then
+                return finish('cash_confirmed_fast',after,cash)
             end
             if after==0 and firstZero and tick-started>=9.0
                 and tick-firstZero>=3.5 and tick-lastCashAt>=1.2 then

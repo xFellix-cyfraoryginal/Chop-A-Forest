@@ -4,7 +4,7 @@ return function(C)
     C.hazards, C.dodgeHoldUntil, C.dodgeLastAt = {}, 0, -100
     C.dodgeAudit = {}
     C.stats.dodges = 0
-    C.cfg.dodge = false  -- speedrun mode; auto restores selective dodges after boss reset
+    C.cfg.dodge = true  -- Always check server Warn geometry, including during HP Pause
     local RunService = game:GetService('RunService')
     local RS = game:GetService('ReplicatedStorage')
     local chop = RS:FindFirstChild('Shared')

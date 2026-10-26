@@ -148,7 +148,7 @@ return function(C)
         end
         return false
     end
-    function C:toolCooldown(profile, held)
+    function C:toolCooldown(profile, held, purpose)
         local base=profile=='Fists' and .50 or profile=='Pistol' and .34 or .58
         if profile=='Axe' then base=self.axeDelay or .33 end
         if profile=='Chainsaw' or profile=='Vacuum' then base=.54 end
@@ -168,6 +168,9 @@ return function(C)
                     break
                 end
             end
+        end
+        if purpose=='Combat' and (profile=='Claws' or profile=='Axe') then
+            base=math.max(.13,base*(self.combatFastScale or 1))
         end
         return base
     end
@@ -300,7 +303,7 @@ return function(C)
             worked=self:hold(.40)
         else worked=self:tap() end
         if worked then
-            self.toolAt[key]=os.clock()+self:toolCooldown(profile,held)
+            self.toolAt[key]=os.clock()+self:toolCooldown(profile,held,purpose)
             self.lastInputAt=os.clock()+.11
         end
         return worked

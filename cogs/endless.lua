@@ -1,13 +1,57 @@
--- Click the observed RunEnd.Stage.Endless GUI button after PumpkinHead.
--- Grounded in V10 log: GUI_BUTTON_ACTIVATED => STARTING => EndlessRound.
+-- V4.8.6: robust Endless button input with progressive fallbacks.
+-- V10 confirms RunEnd.Stage.Endless -> STARTING... -> EndlessRound.
 return function(C)
     C.lastEndlessTry=-100
     C.endlessStarted=false
-    local function shown(gui)
-        if not gui or not gui.Parent then return false end
-        if gui:IsA('ScreenGui') then return gui.Enabled end
-        if gui:IsA('GuiObject') then return gui.Visible end
+    C.endlessAttempt=0
+    local function shown(obj)
+        if not obj or not obj.Parent then return false end
+        if obj:IsA('ScreenGui') then return obj.Enabled end
+        if obj:IsA('GuiObject') then return obj.Visible end
         return false
+    end
+    local function starting(btn)
+        for _,node in ipairs(btn:GetDescendants()) do
+            if node:IsA('TextLabel') and
+                tostring(node.Text):upper():find('STARTING',1,true) then
+                return true
+            end
+        end
+        return false
+    end
+    local function activateByMouse(btn)
+        local ok,vim=pcall(function() return game:GetService('VirtualInputManager') end)
+        if not ok or not vim then return false end
+        local pos=btn.AbsolutePosition+btn.AbsoluteSize*.5
+        return pcall(function()
+            vim:SendMouseButtonEvent(pos.X,pos.Y,0,true,game,0)
+            task.wait(.07)
+            vim:SendMouseButtonEvent(pos.X,pos.Y,0,false,game,0)
+        end)
+    end
+    local function activateDirect(btn)
+        local ok=pcall(function() btn:Activate() end)
+        return ok
+    end
+    -- Last resort when injected mouse input cannot reach game UI.
+    -- Do not call every frame; one pass only per retry.
+    local function activateConnections(btn)
+        local worked=false
+        if type(firesignal)=='function' then
+            worked=pcall(function() firesignal(btn.MouseButton1Click) end)
+        end
+        if not worked and type(getconnections)=='function' then
+            local ok,cons=pcall(getconnections,btn.MouseButton1Click)
+            if ok and type(cons)=='table' then
+                for _,conn in ipairs(cons) do
+                    if type(conn.Function)=='function' then
+                        local result=pcall(conn.Function)
+                        worked=worked or result
+                    end
+                end
+            end
+        end
+        return worked
     end
     function C:endlessStep()
         if not self.cfg.combat or not self.running then return false end
@@ -15,63 +59,66 @@ return function(C)
         local run=pg and pg:FindFirstChild('RunEnd')
         if not (run and run:IsA('ScreenGui') and shown(run)) then
             self.endlessStarted=false
+            self.endlessAttempt=0
             return false
         end
         local stage=run:FindFirstChild('Stage')
-        if not (stage and shown(stage)) then return false end
-        local button=stage:FindFirstChild('Endless')
-        if not (button and button:IsA('GuiButton') and shown(button)) then
-            self.stage='ENDLESS: waiting for button'
+        if not (stage and shown(stage)) then
+            self.stage='ENDLESS: waiting for visible results'
+            task.wait(.11)
+            return true
+        end
+        local btn=stage:FindFirstChild('Endless')
+        if not (btn and btn:IsA('GuiButton') and shown(btn)) then
+            self.stage='ENDLESS: waiting for Endless button'
+            task.wait(.11)
+            return true
+        end
+        if starting(btn) then
+            self.endlessStarted=true
+            self.stage='ENDLESS: STARTING confirmed'
+            self.combatFallback=false
+            self.bossResetWatch=nil
+            self.cfg.dodge=true
             task.wait(.12)
             return true
         end
-        local label=button:FindFirstChildWhichIsA('TextLabel',true)
-        if (label and tostring(label.Text):upper():find('STARTING',1,true)) or self.endlessStarted then
-            self.stage='ENDLESS: starting next round'
-            task.wait(.2)
-            return true
-        end
-        if os.clock()-self.lastEndlessTry<2.4 then
-            self.stage='ENDLESS: awaiting GUI response'
+        if self.endlessStarted then
+            self.stage='ENDLESS: waiting for next round'
             task.wait(.12)
             return true
         end
-        local size=button.AbsoluteSize
-        if size.X<25 or size.Y<15 then
-            self.stage='ENDLESS: button loading'
-            task.wait(.1)
+        if os.clock()-self.lastEndlessTry<1.5 then
+            self.stage='ENDLESS: awaiting confirmation'
+            task.wait(.12)
+            return true
+        end
+        if btn.AbsoluteSize.X<25 or btn.AbsoluteSize.Y<15 then
+            self.stage='ENDLESS: waiting for button layout'
+            task.wait(.11)
             return true
         end
         self.lastEndlessTry=os.clock()
+        self.endlessAttempt=self.endlessAttempt+1
         if self.stopHover then self:stopHover() end
         if self.clearWorkHover then self:clearWorkHover() end
         if self.releaseMouse then self:releaseMouse() end
-        -- The V10 log confirms an actual mouse click on this GUI button.
-        -- Use VIM first, because Activate() availability differs by client.
-        local clicked=false
-        local ok,vim=pcall(function() return game:GetService('VirtualInputManager') end)
-        if ok and vim then
-            local point=button.AbsolutePosition+button.AbsoluteSize*.5
-            clicked=pcall(function()
-                vim:SendMouseButtonEvent(point.X,point.Y,0,true,game,0)
-                task.wait(.055)
-                vim:SendMouseButtonEvent(point.X,point.Y,0,false,game,0)
-            end)
-        end
-        if not clicked then
-            clicked=pcall(function() button:Activate() end)
-        end
-        -- Only a confirmed starting banner counts as success.
-        task.wait(.18)
-        if label and tostring(label.Text):upper():find('STARTING',1,true) then
+        local method=(self.endlessAttempt-1)%3
+        local methodLabel=method==0 and 'mouse' or method==1 and 'Activate' or 'signal'
+        local ok=false
+        if method==0 then ok=activateByMouse(btn)
+        elseif method==1 then ok=activateDirect(btn)
+        else ok=activateConnections(btn) end
+        task.wait(.19)
+        if starting(btn) then
             self.endlessStarted=true
-            self.combatFallback=false  -- a completed run is not a boss reset
+            self.combatFallback=false
             self.bossResetWatch=nil
-            self.cfg.dodge=false
-            self:note('ENDLESS: round start confirmed by GUI')
+            self.cfg.dodge=true
+            self:note('ENDLESS: STARTING confirmed via '..methodLabel)
         else
-            self:note(clicked and 'ENDLESS: clicked, awaiting confirmation'
-                or 'ENDLESS: input unavailable, will retry')
+            self:note('ENDLESS: '..methodLabel..' attempt '..self.endlessAttempt
+                ..(ok and ', awaiting game ack' or ' failed; fallback next'))
         end
         return true
     end

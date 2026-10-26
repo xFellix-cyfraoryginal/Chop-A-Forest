@@ -45,6 +45,7 @@ return function(C)
         if self.bossLock and not self:enemyValid(self.bossLock) then
             self.bossLock=nil
         end
+        if self.cfg.bossOnly then return chosenBoss end
         return chosenSkeleton or chosenPumpkin or chosenBoss
     end
     function C:mobInterrupt()
@@ -57,6 +58,7 @@ return function(C)
         if self.endlessStep and self:endlessStep() then return end
         if self.reconcileSale then self:reconcileSale() end
         if self:isPaused() then
+            -- Heartbeat dodge remains active while the scheduler rests.
             self.stage='HP PAUSE: '..math.max(0,math.ceil(self.hpHoldUntil-os.clock()))..'s'
             task.wait(.18); return
         end
@@ -80,6 +82,13 @@ return function(C)
                     self.stage='MOBS: boss'
                 end
                 self:fight(mob)
+                return
+            end
+            if self.cfg.bossOnly and self:pickBoss() then
+                -- Boss exists but is temporarily on enemyRetry cooldown.
+                -- Stay locked on him instead of switching to trees.
+                self.stage='BOSS ONLY: waiting for next boss hit'
+                task.wait(.075)
                 return
             end
         end
@@ -236,14 +245,14 @@ return function(C)
         self.bossLock=nil
         self.combatFallback=false
         self.bossResetWatch=nil
-        self.cfg.dodge=false  -- fast-mode request: do not waste time on distant warnings
+        self.cfg.dodge=true -- geometry-selective: dodge threats at OUR coordinates
         self.salePending=nil
         self.nextSellTry=0
         self.pickupUnblockAt=0
         self.handLogWaitSince=nil
         local session=self.session
         self.stage='STARTING'
-        self:note('V4.8.5 FAST MOBS -> BOSS: farm='..tostring(self.cfg.farm)
+        self:note('V4.8.6 HITBOX + SELL: farm='..tostring(self.cfg.farm)
             ..', kill='..tostring(self.cfg.combat))
         task.spawn(function() self:watchSafety(session) end)
         task.spawn(function() self:tryBuyClawsSpeed('start balance') end)

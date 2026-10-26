@@ -21,10 +21,10 @@ return function(C)
         local ok,hui=pcall(gethui)
         if ok and hui then parent=hui end
     end
-    local gui=make('ScreenGui',{Name='CAF_FarmMobs_V4_7_9',ResetOnSpawn=false,
+    local gui=make('ScreenGui',{Name='CAF_FarmMobs_V4_8_6',ResetOnSpawn=false,
         IgnoreGuiInset=true,ZIndexBehavior=Enum.ZIndexBehavior.Sibling},parent)
     C.gui=gui
-    local panel=round(make('Frame',{Size=UDim2.fromOffset(344,372),
+    local panel=round(make('Frame',{Size=UDim2.fromOffset(344,468),
         Position=UDim2.fromOffset(24,112),BackgroundColor3=dark,BorderSizePixel=0},gui),11)
     make('UIStroke',{Color=Color3.fromRGB(68,83,106),Thickness=1},panel)
     local head=round(make('Frame',{Size=UDim2.new(1,0,0,44),
@@ -47,7 +47,7 @@ return function(C)
         Size=UDim2.new(1,0,1,-44),BackgroundTransparency=1},panel)
     action(head,'_',7,29,dark,function()
         collapsed=not collapsed
-        panel.Size=UDim2.fromOffset(344,collapsed and 44 or 372)
+        panel.Size=UDim2.fromOffset(344,collapsed and 44 or 468)
         body.Visible=not collapsed
     end,272,28)
     local taskLabel=make('TextLabel',{Position=UDim2.fromOffset(12,7),
@@ -92,7 +92,25 @@ return function(C)
         Text='Claws Speed: checking price',TextColor3=muted,
         TextSize=11,Font=Enum.Font.Gotham,
         TextXAlignment=Enum.TextXAlignment.Left},body)
-    make('TextLabel',{Position=UDim2.fromOffset(12,321),Size=UDim2.new(1,-24,0,22),
+    local ignorePause=action(body,'IGNORE HP PAUSE: OFF',321,33,surface,function()
+        C.cfg.ignoreHPPause=not C.cfg.ignoreHPPause
+        if C.cfg.ignoreHPPause then
+            -- Kill a held recovery state immediately. Keep dodge ON.
+            C.hpHoldUntil=0
+            C.skyHoldPosition,C.skyLanding=nil,nil
+        end
+        C:note('Ignore HP Pause '..(C.cfg.ignoreHPPause and 'ON' or 'OFF'))
+    end)
+    local bossOnly=action(body,'BOSS ONLY: OFF',361,33,surface,function()
+        C.cfg.bossOnly=not C.cfg.bossOnly
+        -- Release minion follow; the next workStep will select Guardian only.
+        if C.cfg.bossOnly and C.followTarget
+            and C.followTarget:GetAttribute('Monster')~='Guardian' then
+            C:stopHover()
+        end
+        C:note('Boss Only '..(C.cfg.bossOnly and 'ON' or 'OFF'))
+    end)
+    make('TextLabel',{Position=UDim2.fromOffset(12,398),Size=UDim2.new(1,-24,0,22),
         BackgroundTransparency=1,Text='F6 START/STOP   |   F8 STOP',
         TextSize=11,TextColor3=muted,Font=Enum.Font.Gotham,
         TextXAlignment=Enum.TextXAlignment.Left},body)
@@ -135,6 +153,10 @@ return function(C)
             speedInfo.Text='Claw Speed Lv'..tostring(level or 0)..': '
                 ..(state=='MAX' and 'MAXED' or cost and ('next '..tostring(cost)..' coins')
                     or tostring(state or 'unknown'))
+            ignorePause.Text='IGNORE HP PAUSE: '..(C.cfg.ignoreHPPause and 'ON' or 'OFF')
+            ignorePause.BackgroundColor3=C.cfg.ignoreHPPause and green or surface
+            bossOnly.Text='BOSS ONLY: '..(C.cfg.bossOnly and 'ON' or 'OFF')
+            bossOnly.BackgroundColor3=C.cfg.bossOnly and green or surface
             move.Text='MOVEMENT: '..C.cfg.move
             move.BackgroundColor3=C.cfg.move=='Walk' and green or surface
             task.wait(.28)

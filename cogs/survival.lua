@@ -26,10 +26,12 @@ return function(C)
     -- Retain compatibility without rejecting valuable trees or logs.
     function C:isRiskPos(_) return false end
     function C:isPaused()
-        return self.cfg.hpPause and os.clock() < self.hpHoldUntil
+        return self.cfg.hpPause and not self.cfg.ignoreHPPause
+            and os.clock() < self.hpHoldUntil
     end
     function C:urgentCombat()
-        if not self.cfg.combat or self:isPaused() or self.cfg.priority=='ATTACK' then
+        if not self.cfg.combat or self.cfg.bossOnly or self:isPaused()
+            or self.cfg.priority=='ATTACK' then
             return false -- ATTACK FIRST ignores Pumpkinling retaliation; HP safety stays active.
         end
         if os.clock() > self.retaliateUntil then return false end
@@ -86,7 +88,7 @@ return function(C)
     end
 
     function C:beginHPHold(hp)
-        if not self.running or not self.cfg.hpPause then return end
+        if not self.running or not self.cfg.hpPause or self.cfg.ignoreHPPause then return end
         local now = os.clock()
         if self:isPaused() or now-self.lastHoldAt < self.cfg.pauseSeconds+3 then return end
         self:cancelMove() -- Cancels previous chase/tree/navigation immediately.
@@ -165,7 +167,8 @@ return function(C)
                 end
             end
             -- Never wait for monsters to leave before retreating.
-            if self.cfg.hpPause and hp>0 and fraction<=self.cfg.pauseHP then
+            if self.cfg.hpPause and not self.cfg.ignoreHPPause
+                and hp>0 and fraction<=self.cfg.pauseHP then
                 self:beginHPHold(hp)
             end
             last=hp; self.lastHP=hp
