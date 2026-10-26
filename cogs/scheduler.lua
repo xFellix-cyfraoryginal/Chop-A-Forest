@@ -35,9 +35,10 @@ return function(C)
                 self.eventPending[mob]=nil
             end
         end
-        -- Once the Guardian fight begins, ignore all minions until he dies.
-        if chosenBoss and (chosenBoss:GetAttribute('State')=='Fighting'
-            or self.bossLock==chosenBoss) then
+        -- Fast run: clear skeletons and pumpkinlings BEFORE engaging Jack.
+        -- If the Guardian actually resets, restore legacy boss-first focus.
+        if self.combatFallback and chosenBoss and
+            (chosenBoss:GetAttribute('State')=='Fighting' or self.bossLock==chosenBoss) then
             self.bossLock=chosenBoss
             return chosenBoss
         end
@@ -52,6 +53,8 @@ return function(C)
         return self:pendingEventMob()~=nil
     end
     function C:workStep()
+        -- End-of-run UI is authoritative. After PumpkinHead, click Endless.
+        if self.endlessStep and self:endlessStep() then return end
         if self.reconcileSale then self:reconcileSale() end
         if self:isPaused() then
             self.stage='HP PAUSE: '..math.max(0,math.ceil(self.hpHoldUntil-os.clock()))..'s'
@@ -231,13 +234,16 @@ return function(C)
         self.safeTree=nil; self.safeTreeUntil=0
         self.eventSeen,self.eventPending={},{}
         self.bossLock=nil
+        self.combatFallback=false
+        self.bossResetWatch=nil
+        self.cfg.dodge=false  -- fast-mode request: do not waste time on distant warnings
         self.salePending=nil
         self.nextSellTry=0
         self.pickupUnblockAt=0
         self.handLogWaitSince=nil
         local session=self.session
         self.stage='STARTING'
-        self:note('V4.8.2 FARM/MOBS: farm='..tostring(self.cfg.farm)
+        self:note('V4.8.5 FAST MOBS -> BOSS: farm='..tostring(self.cfg.farm)
             ..', kill='..tostring(self.cfg.combat))
         task.spawn(function() self:watchSafety(session) end)
         task.spawn(function() self:tryBuyClawsSpeed('start balance') end)

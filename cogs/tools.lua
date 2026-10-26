@@ -277,6 +277,14 @@ return function(C)
         if aimPoint then
             self:aimAt(aimPoint)
             task.wait(.035) -- allow camera/input frame to observe the new aim
+            if purpose=='Combat' and type(target)=='function' then
+                -- A moving enemy may move DURING those 35ms; aim again.
+                local ok,fresh=pcall(target)
+                if not ok or typeof(fresh)~='Vector3' then
+                    return false,'Enemy moved or despawned before hit'
+                end
+                self:aimAt(fresh)
+            end
         end
         if not self.running or self:isPaused() then return false end
         if self.isDodging and self:isDodging() then return false,'Dodging red zone' end

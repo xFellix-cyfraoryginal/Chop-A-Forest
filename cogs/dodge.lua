@@ -4,7 +4,7 @@ return function(C)
     C.hazards, C.dodgeHoldUntil, C.dodgeLastAt = {}, 0, -100
     C.dodgeAudit = {}
     C.stats.dodges = 0
-    C.cfg.dodge = true
+    C.cfg.dodge = false  -- speedrun mode; auto restores selective dodges after boss reset
     local RunService = game:GetService('RunService')
     local RS = game:GetService('ReplicatedStorage')
     local chop = RS:FindFirstChild('Shared')
@@ -122,6 +122,8 @@ return function(C)
                 expiry=math.max(expiry,h.expires+.12)
             end
         end
+        -- Never dodge an AoE drawn far from the player. The geometry is
+        -- checked at the current position, not merely because Warn exists.
         self.dodgeHoldUntil=math.max(self.dodgeHoldUntil,expiry)
         self.dodgeLastAt=now
         self.motion=self.motion+1 -- invalidate older Walk / TP route

@@ -4,7 +4,7 @@ return function(C)
     local rs=game:GetService('RunService')
     C.enemyRetry={}
     C.followTarget=nil
-    C.followHeight=3.8
+    C.followHeight=1.55
     C.savedAutoRotate=nil
     C.lastWalkMoveAt=-100
     function C:stopHover()
@@ -59,13 +59,15 @@ return function(C)
         local boss=enemy:GetAttribute('Monster')=='Guardian'
         local goal
         if boss then
-            local angle=os.clock()*.95
-            local r=C.followHeight>=3.5 and 2.1 or 1.35
+            -- Keep the weapon/crosshair within the enemy's hitbox reach.
+            -- Old 3.8-up / 2.1-away orbit caused repeated no-damage swings.
+            local angle=os.clock()*.72 + (C.combatOrbitShift or 0)
+            local r=(C.followHeight>2) and 1.65 or 1.12
             goal=at+Vector3.new(math.cos(angle)*r,C.followHeight,
                 math.sin(angle)*r)
-            C.stage='BOSS: air orbit + attacking'
+            C.stage='BOSS: close air follow + attacking'
         else
-            goal=at+Vector3.new(.7,math.min(C.followHeight,3.2),.7)
+            goal=at+Vector3.new(.55,math.min(C.followHeight,1.65),.55)
         end
         if C.enableAirHold then C:enableAirHold(root) end
         root.CFrame=CFrame.lookAt(goal,Vector3.new(at.X,goal.Y,at.Z))
@@ -191,6 +193,7 @@ return function(C)
             end
         end
         if not self:startHover(enemy) then return false end
+        if self.cfg.move=='Instant TP' then task.wait(.045) end -- one hover frame before first LPM
         local misses,shots=0,0
         local lastHP=enemy:GetAttribute('HP')
         local boss=enemy:GetAttribute('Monster')=='Guardian'
@@ -200,7 +203,7 @@ return function(C)
             and shots<(boss and 130 or 40) and os.clock()<deadline do
             if not boss then
                 local guardian=self:pickBoss()
-                if guardian and (guardian:GetAttribute('State')=='Fighting'
+                if self.combatFallback and guardian and (guardian:GetAttribute('State')=='Fighting'
                     or self.bossLock==guardian) then
                     self.bossLock=guardian
                     self:note('BOSS ACTIVE: dropping minion target')
@@ -228,9 +231,19 @@ return function(C)
             local before=enemy:GetAttribute('HP')
             local ok,why=self:useItem(function()
                 local p=self:enemyPosition(enemy)
-                return p and p+Vector3.new(0,.55,0)
+                if not p then return nil end
+                -- Camera is updated against the current hitbox before input.
+                return p+Vector3.new(0,.35,0)
             end,'Combat')
-            if not ok then self:note(why or 'Combat input failed'); break end
+            if not ok then
+                if self.isDodging and self:isDodging() then
+                    -- Do not abandon an in-progress fight during a short dodge.
+                    task.wait(.045)
+                else
+                    self:note(why or 'Combat input failed')
+                    break
+                end
+            else
             shots=shots+1
             local confirmed=false
             local untilAt=os.clock()+(boss and .45 or .55)
@@ -244,26 +257,31 @@ return function(C)
             end
             if confirmed then
                 misses=0
-                self.followHeight=3.8
+                self.followHeight=1.55
             else
                 misses=misses+1
-                -- Try a closer vertical offset after misses; target keeps moving.
-                self.followHeight=misses%2==0 and 2.8 or 3.3
-                if misses>=5 then
-                    self:note('No confirmed damage; adjusting target')
-                    if not boss or misses>=9 then break end
+                -- Move THROUGH close hitbox sectors, not higher above Jack.
+                self.followHeight=misses%2==0 and 1.10 or 1.85
+                self.combatOrbitShift=(self.combatOrbitShift or 0)+.85
+                if misses>=4 then
+                    self:note('Combat no HP delta: adjusting close hitbox')
+                    if not boss or misses>=12 then break end
                 end
             end
+            end -- successful input
             end -- walk range gate
             end -- dodge gate
         end
         self:stopHover()
-        self.followHeight=3.8
+        self.followHeight=1.55
         local finalHP=enemy:GetAttribute('HP')
         local dead=(type(finalHP)=='number' and finalHP<=0)
             or enemy:GetAttribute('State')=='Dead'
         if dead then
-            if boss then self.bossLock=nil end
+            if boss then
+                self.bossLock=nil
+                self.bossResetWatch=nil -- finished boss is NOT a future reset
+            end
             self.stats.kills=self.stats.kills+1
             self:note('Monster defeated (HP confirmed)')
             return true
