@@ -1,34 +1,31 @@
-Chop-A-Forest V4.8.7 — BOSS RUSH / OLD AIM / ENDLESS CLICK FIX
+Chop-A-Forest V4.8.8 — SELL SERVER ACK ONLY
 
-PATCH ONLY na V4.8.6.
-
-PODMIEŃ 8 PLIKÓW:
+BAZA: V4.8.7. Patch zawiera TYLKO:
   main.lua
-  cogs/core.lua
-  cogs/combat.lua
-  cogs/dodge.lua
-  cogs/survival.lua
-  cogs/scheduler.lua
-  cogs/ui.lua
-  cogs/endless.lua
+  cogs/collection.lua
+
+POTWIERDZONE W LOGACH V9:
+  CarriedLogs 5 -> 0
+  Stat_LogsSold 3908 -> 3913  (5 nowych sprzedanych)
+  Oba atrybuty zmienily sie przy sprzedazy w tej samej chwili.
 
 ZMIANY:
-- BOSS ONLY=ON + IGNORE HP PAUSE=ON: tryb BOSS RUSH — całkowity brak
-  uników czerwonych ostrzeżeń, brak przerw HP i wycofywania się.
-  Gdy Jack istnieje, bot nie przechodzi do małych mobów ani drzew.
-  Pozostałe kombinacje przełączników zachowują normalne uniki.
-- Przywrócone celowanie z V4.8.5: środek replikowanego modelu
-  Jacka zamiast losowej części Hitbox/Body. W trybie Boss Rush nie
-  zwiększa odległości od niego po nietrafieniu.
-- BOSS RUSH nadal wymaga faktycznych trafień i cooldownu akceptowanego
-  przez serwer. Nie gwarantuje nieśmiertelności — postać może zginąć.
-- ENDLESS: poprawka pionowego przesunięcia kliknięcia (inset GUI),
-  retry co 0.75 s różnymi metodami oraz widoczne numerowane próby.
-  Sukces rozpoznawany po STARTING...; gra może nadal odmówić.
-- Sprzedaż, plecak, farmienie, Egg, PumpkinHead i Claw Speed bez zmian.
+- Sprzedaz: rzeczywiste potwierdzenie serwera (Stat_LogsSold rośnie o
+  liczbę kłód, CarriedLogs = 0, HUD = 0).
+- Przy torbie: najpierw wejscie na DepositPad, potem wycelowane LPM
+  z boku, jezeli sam kontakt nie zadziala. Potem powrot na pad.
+- Bez plecaka, z kłodami w rekach: BEZ fallbacku LPM, aby nie rzucic drewnem.
+- Nie odblokowuje pickupu od samego 0/30 ani od zarobku za moba.
+- Gdy attr sold/carried jest opozniony, wraca na pad i ponawia proby
+  zamiast zawiesic sie z serverowym Bag Full.
+- Legacy fallback tylko gdy oba atrybuty sa niedostepne (9s + 5s stabilne 0).
+- Dziennik ostatnich 20 prob: env.CAF_V4.sellAudit
+- TYLKO collector. Boss 4.8.7, Endless, movement, UI pozostaja bez zmian.
 
-Uruchom po commit:
-loadstring(game:HttpGet("https://raw.githubusercontent.com/xFellix-cyfraoryginal/Chop-A-Forest/main/main.lua?v=4.8.7"))()
+COMMIT oba pliki do githuba, potem wykonaj:
+loadstring(game:HttpGet("https://raw.githubusercontent.com/xFellix-cyfraoryginal/Chop-A-Forest/main/main.lua?v=4.8.8"))()
 
-Test lokalny: texlua składnia; statyczna walidacja patcha.
-NIE testowano wewnątrz Roblox.
+TEST: sprawdz czy po 30/30 -> 0/30 podnosi kolejna klode bez Bag Full.
+Przy niepowodzeniu podaj komunikat: SELL no server confirmation...
+
+Walidacja offline: kompilacja skladni texlua; nie testowano w Roblox.

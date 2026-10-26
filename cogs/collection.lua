@@ -88,18 +88,21 @@ return function(C)
         self:note('Pickup failed; wood remains in queue')
         return false
     end
-    -- V4.8.6: Fast credited sale. 9s fallback if server cash is late.
-    -- Never accept the bag HUD going 0 without payment confirmation.
-    -- Full 9 seconds minimum, up to 13.5 seconds for delayed settlement.
-    -- If the bag does not start draining after 2.1 seconds, click the pad ONCE.
-    -- Leave pickup locked on failed/uncertain sales, never trust a transient 0/30.
+    -- V4.8.8: Server-confirmed sale.
+    -- V9 showed that a real deposit changes BOTH:
+    --   CarriedLogs 5->0 and Stat_LogsSold 3908->3913.
+    -- Cash/Stat_CashEarned may also rise from MOB KILLS and must NEVER
+    -- be the sole reason we unlock pickups after a HUD 0/30 flicker.
     local function readCash(self)
         local stats=self.player:FindFirstChild('leaderstats')
         local cash=stats and stats:FindFirstChild('Cash')
         return cash and tonumber(cash.Value) or nil
     end
-    local function readEarned(self)
-        return tonumber(self.player:GetAttribute('Stat_CashEarned'))
+    local function readSold(self)
+        return tonumber(self.player:GetAttribute('Stat_LogsSold'))
+    end
+    local function readCarried(self)
+        return tonumber(self.player:GetAttribute('CarriedLogs'))
     end
     function C:findSellPad()
         local pads={}
@@ -121,11 +124,57 @@ return function(C)
         end
         return best
     end
-    -- Scheduler from 4.8.2 calls this at the beginning of each workStep.
-    -- Do NOT release the lock there: the full pad dwell owns settlement.
-    function C:reconcileSale()
-        return false
+    -- The owner of the sale lock is sellBag. Never unlock in workStep.
+    function C:reconcileSale() return false end
+
+    -- Manually selling in the V7 logger produced a DepositPad ray hit and
+    -- the bag fell to zero immediately. Stand BESIDE the pad when clicking,
+    -- not exactly over it where a straight-down aim can be obstructed.
+    -- DO NOT do this if carrying logs in HANDS: LMB can throw them.
+    local function clickSellPad(self,pad,origin)
+        local _,ownsBag,carrying=self:equipmentStatus()
+        if not ownsBag or (carrying and carrying>0 and readCarried(self)==nil) then
+            return false,'hand_carry_no_click'
+        end
+        local _,root=self:character()
+        if not root then return false,'no_root' end
+        local center=pad.Position
+        local delta=origin-center
+        local side=Vector3.new(delta.X,0,delta.Z)
+        if side.Magnitude<.25 then
+            local forward=pad.CFrame.LookVector
+            side=Vector3.new(forward.X,0,forward.Z)
+        end
+        if side.Magnitude<.25 then side=Vector3.new(0,0,1) end
+        local dist=math.clamp(math.max(pad.Size.X,pad.Size.Z)*.6+2.5,5,10)
+        local vantage=center+side.Unit*dist
+        local ground=self:ground(vantage)
+        if not ground then return false,'vantage_missing' end
+        if self.cfg.move=='Instant TP' then
+            root.CFrame=CFrame.new(ground)*root.CFrame.Rotation
+            root.AssemblyLinearVelocity=Vector3.zero
+        elseif not self:goTo(vantage,1.0) then
+            return false,'walk_vantage_blocked'
+        end
+        self:aimAt(center+Vector3.new(0,pad.Size.Y*.5,0))
+        task.wait(.05)
+        if not self.running or self:isPaused() then return false,'interrupted' end
+        -- VIM/Mouse click is NOT guaranteed to hit the pad: verify the ray.
+        local cam=self.ws.CurrentCamera
+        if cam then
+            self:aimAt(center+Vector3.new(0,pad.Size.Y*.5,0))
+            local params=RaycastParams.new()
+            params.FilterType=Enum.RaycastFilterType.Exclude
+            local ch=self.player.Character
+            params.FilterDescendantsInstances=ch and {ch} or {}
+            local hit=self.ws:Raycast(cam.CFrame.Position,cam.CFrame.LookVector*35,params)
+            if not hit or hit.Instance~=pad then
+                return false,'pad_not_under_crosshair'
+            end
+        end
+        return self:tap(),'aimed_pad_click'
     end
+
     function C:sellBag()
         if not self.running or self:isPaused() then return false end
         local now=os.clock()
@@ -133,130 +182,141 @@ return function(C)
         if sale and now<(sale.retryAt or 0) then return false end
         if not sale and now<(self.nextSellTry or 0) then return false end
         if not sale then
-            local before=self:backpack()
-            if not before or before<1 then return false end
-            sale={before=before,at=now,visits=0,retryAt=0,
-                cash=readCash(self),earned=readEarned(self)}
+            local hud=self:backpack()
+            local carried=readCarried(self)
+            local before=math.max(hud or 0,carried or 0)
+            if before<1 then return false end
+            sale={before=before,at=now,retryAt=0,visits=0,
+                soldStart=readSold(self),carriedStart=carried,cashStart=readCash(self)}
             self.salePending=sale
         end
         local pad=self:findSellPad()
         if not pad then
-            sale.retryAt=os.clock()+2
-            self:note('SELL: DepositPad missing (retry)')
+            sale.retryAt=os.clock()+1.5
+            self:note('SELL: no DepositPad, retrying')
             return false
         end
         if self.clearWorkHover then self:clearWorkHover() end
         if self.disableAirHold then self:disableAirHold() end
         if self.releaseMouse then self:releaseMouse() end
-        self.stage='SELL: center of DepositPad'
-        local point=pad.Position
-        if not self:goTo(point,.65) then
+        -- We deliberately DO NOT use generic ground() for the pad center:
+        -- it can raycast onto decor/woodchipper OVER the actual DepositPad.
+        local center=pad.Position
+        local standPos=center+Vector3.new(0,pad.Size.Y*.5+2.65,0)
+        local approachFrom=self:position() or center+Vector3.new(0,0,10)
+        self.stage='SELL: entering DepositPad'
+        -- goTo handles walking mode; precise placement below handles TP.
+        if not self:goTo(center,.8) then
             sale.retryAt=os.clock()+.7
             return false
         end
         sale.visits=sale.visits+1
         local started=os.clock()
-        local deadline=started+13.5
+        local maxUntil=started+12.5
         local firstZero=nil
-        local lowest=sale.before
+        local firstAck=nil
         local clicked=false
-        local cashStart=sale.cash or readCash(self)
-        local earnedStart=sale.earned or readEarned(self)
-        local lastCash,lastCashAt=cashStart,started
-        local creditedAt=nil
-        local lastCenter=started
-        local standPos=self:ground(point) or (point+Vector3.new(0,3.15,0))
-        local function finish(status,after,cash)
+        local clickTried=false
+        local retryClickAt=started+.85
+        local lastClickReason='none'
+        local lastTouch=started
+        local bestSold=0
+        local function audit(status,after,carried,soldDelta)
             self.sellAudit=self.sellAudit or {}
-            local audit=self.sellAudit
-            audit[#audit+1]={status=status,bagBefore=sale.before,
-                bagAfter=after,cashBefore=sale.cash,cashAfter=cash,
-                earnedBefore=sale.earned,earnedAfter=readEarned(self),
-                seconds=math.floor((os.clock()-started)*10+.5)/10,
-                credited=(creditedAt~=nil),
-                visits=sale.visits,clicked=clicked}
-            if #audit>20 then table.remove(audit,1) end
+            local history=self.sellAudit
+            history[#history+1]={status=status,before=sale.before,
+                bagAfter=after,carriedAfter=carried,
+                soldStart=sale.soldStart,soldAfter=readSold(self),
+                soldDelta=soldDelta,cashBefore=sale.cashStart,
+                cashAfter=readCash(self),visits=sale.visits,
+                clicked=clicked,clickReason=lastClickReason,
+                seconds=math.floor((os.clock()-started)*10+.5)/10}
+            if #history>20 then table.remove(history,1) end
+        end
+        local function success(status,after,carried,soldDelta)
+            audit(status,after,carried,soldDelta)
             self.stats.sold=self.stats.sold+sale.before
             self.salePending=nil
-            self.pickupUnblockAt=os.clock()+.85
-            self:note('SELL: credited/fallback settled '..tostring(sale.before)
-                ..' logs ('..status..')')
+            -- Short post-sale settle avoids an immediate pickup before
+            -- the server has replicated all parts of the bag update.
+            self.pickupUnblockAt=os.clock()+.60
+            self:note('SELL: confirmed '..tostring(sale.before)..' logs ('..status..')')
             return true
         end
-        self.stage='SELL: money confirmation / 9s fallback'
+        self.stage='SELL: waiting for server LogsSold + carried=0'
         while self.running and self.live and not self:isPaused()
-            and not self:urgentCombat() and pad.Parent and os.clock()<deadline do
+            and not self:urgentCombat() and pad.Parent and os.clock()<maxUntil do
             local tick=os.clock()
-            -- Stay physically on the pad; the tree air-hover MUST remain off.
             local _,root,hum=self:character()
             if not root then break end
+            -- Keep avatar physically at the PAD, not floating above the
+            -- woodchipper. Do not zero velocity every frame (touch events).
             if self.cfg.move=='Instant TP' then
-                if (root.Position-standPos).Magnitude>.8 then
+                if (root.Position-standPos).Magnitude>1.35 then
                     root.CFrame=CFrame.new(standPos)*root.CFrame.Rotation
                 end
-                root.AssemblyLinearVelocity=Vector3.zero
-            elseif hum and tick-lastCenter>=.35 then
+            elseif hum and tick-lastTouch>.5 then
                 hum:MoveTo(standPos)
             end
-            if tick-lastCenter>=.35 then lastCenter=tick end
-            local after=self:backpack()
-            if after then
-                lowest=math.min(lowest,after)
-                if after==0 then
-                    firstZero=firstZero or tick
-                else
-                    firstZero=nil -- HUD zero flickered: not settled
+            if tick-lastTouch>.5 then lastTouch=tick end
+            local bag=self:backpack()
+            local carried=readCarried(self)
+            local sold=readSold(self)
+            local soldDelta=(sale.soldStart and sold)
+                and math.max(0,sold-sale.soldStart) or 0
+            bestSold=math.max(bestSold,soldDelta)
+            if bag==0 and (carried==nil or carried==0) then
+                firstZero=firstZero or tick
+            else
+                firstZero=nil
+            end
+            -- Strong server acknowledgement captured in V9; never substitute
+            -- a random mob cash drop for a wood sale.
+            local strongAck=sale.soldStart~=nil and sale.carriedStart~=nil
+                and soldDelta>=sale.before and carried==0 and bag==0
+            if strongAck then firstAck=firstAck or tick else firstAck=nil end
+            if strongAck and firstAck and tick-firstAck>=.40 then
+                return success('SERVER_LOGS_SOLD',bag,carried,soldDelta)
+            end
+            -- First allow pad contact. If it hasn't sold, click the PAD
+            -- from beside it (not from inside its own collider).
+            -- NEVER click while carrying logs without a backpack.
+            if not clickTried and tick>=retryClickAt
+                and not strongAck and math.max(carried or 0,bag or 0)>0 then
+                clickTried=true
+                self.stage='SELL: looking at DepositPad and clicking'
+                local ok,why=clickSellPad(self,pad,approachFrom)
+                clicked=ok and true or false
+                lastClickReason=why
+                if not ok then self:note('SELL: click '..tostring(why)..'; pad touch fallback') end
+                -- Enter pad again after the click: this retriggers the pad
+                -- touch path if the server ignores a click-only approach.
+                local _,r=self:character()
+                if r and self.cfg.move=='Instant TP' then
+                    r.CFrame=CFrame.new(standPos)*r.CFrame.Rotation
+                elseif r then
+                    self:goTo(center,.8)
                 end
+                self.stage='SELL: waiting for server LogsSold + carried=0'
             end
-            local cash=readCash(self)
-            if cash and lastCash and cash~=lastCash then
-                lastCashAt=tick
-                lastCash=cash
+            -- If attributes are completely unavailable, use the old long
+            -- stable-HUD fallback. Never use this if either attr exists but
+            -- explicitly disagrees with the HUD.
+            if sale.soldStart==nil and sale.carriedStart==nil
+                and firstZero and tick-firstZero>=5 and tick-started>=9 then
+                return success('LEGACY_HUD_ONLY',bag,carried,soldDelta)
             end
-            -- Server-side wallet growth + the EMPTY bag together provide
-            -- a stronger acknowledgement than a transient 0/30 on the HUD.
-            local earned=readEarned(self)
-            local gainedCash=cashStart~=nil and cash~=nil and cash>cashStart
-            local gainedEarned=earnedStart~=nil and earned~=nil and earned>earnedStart
-            if not creditedAt and (gainedCash or gainedEarned) then
-                creditedAt=tick
-            end
-            -- Restored V4.8.0 fallback, also fixes 0->full HUD flicker.
-            -- Recheck CURRENT count, not the lowest historical count.
-            -- No click while carrying logs IN HANDS: LMB could throw them.
-            if not clicked and tick-started>=2.1
-                and after and after>=sale.before then
-                clicked=true
-                local _,ownsBag,carrying=self:equipmentStatus()
-                if ownsBag or (carrying or 0)==0 then
-                    self.stage='SELL: old Deposit click fallback'
-                    self:useItem(point,'Deposit')
-                else
-                    self:note('SELL: keeping held wood safe; pad touch only')
-                end
-                self.stage='SELL: original 9s dwell (max 13.5s)'
-            end
-            if after==0 and firstZero and creditedAt
-                and tick-started>=2.8 and tick-firstZero>=1.05
-                and tick-creditedAt>=.35 then
-                return finish('cash_confirmed_fast',after,cash)
-            end
-            if after==0 and firstZero and tick-started>=9.0
-                and tick-firstZero>=3.5 and tick-lastCashAt>=1.2 then
-                return finish('stable_9s',after,cash)
-            end
-            task.wait(.12)
+            task.wait(.10)
         end
-        local after=self:backpack()
-        if after==0 and firstZero and os.clock()-firstZero>=3.5
-            and os.clock()-started>=9.0 then
-            return finish('stable_timeout',after,readCash(self))
-        end
-        -- If a transient HUD zero is not a real sale, do not allow pickup.
-        -- The scheduler will retry the platform after a short backoff.
-        sale.retryAt=os.clock()+.75
-        self:note('SELL not settled ('..tostring(after)..'/'
-            ..tostring(sale.before)..'); retrying old 9s pad')
+        local bag=self:backpack()
+        local carried=readCarried(self)
+        local soldDelta=(sale.soldStart and readSold(self))
+            and math.max(0,readSold(self)-sale.soldStart) or 0
+        audit('WAITING_SERVER',bag,carried,soldDelta)
+        sale.retryAt=os.clock()+.85
+        self:note('SELL: no server confirmation (hud='..tostring(bag)
+            ..', carried='..tostring(carried)..', soldDelta='..tostring(soldDelta)
+            ..'); retry on DepositPad')
         return false
     end
 end
